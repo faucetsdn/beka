@@ -1,0 +1,3 @@
+class Event:
+    TIMER_EXPIRED = 1
+    MESSAGE_RECEIVED = 2
