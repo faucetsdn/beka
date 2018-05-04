@@ -21,7 +21,7 @@ class Chopper(object):
         elif extra_data_length < 0:
             raise ValueError("Invalid BGP length field")
         else:
-            serialised_body = None
+            serialised_body = b""
 
         return message_type, serialised_body
 
