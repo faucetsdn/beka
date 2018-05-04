@@ -17,13 +17,13 @@ class Chopper(object):
         header, length, message_type = self.load_header()
         extra_data_length = length - self.HEADER_LENGTH
         if extra_data_length > 0:
-            message = header + self.input_stream.read(extra_data_length)
+            serialised_body = self.input_stream.read(extra_data_length)
         elif extra_data_length < 0:
             raise ValueError("Invalid BGP length field")
         else:
-            message = header
+            serialised_body = None
 
-        return message
+        return message_type, serialised_body
 
     def load_header(self):
         # TODO handle when stream runs out

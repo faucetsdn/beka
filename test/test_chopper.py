@@ -13,12 +13,7 @@ class ChopperTestCase(unittest.TestCase):
             b"ten bytes!",
             b"junk data at the end"
         )
-        expected_message = struct.pack("!16sHB10s",
-            b"\xFF" * 16,
-            29,
-            1,
-            b"ten bytes!"
-        )
+        expected_message = (1, b"ten bytes!")
         input_stream = BytesIO(serialised_data)
         message = chopper.Chopper(input_stream).next()
 
