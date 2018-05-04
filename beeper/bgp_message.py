@@ -26,8 +26,18 @@ class BgpOpenMessage(BgpMessage):
 
     @classmethod
     def parse(cls, serialised_message):
+        # we ignore optional parameters
         version, peer_as, hold_time, identifier, optional_parameters_length = struct.unpack("!BHHIB", serialised_message[:10])
         return cls(version, peer_as, hold_time, identifier)
+
+    def pack(self):
+        return struct.pack("!BHHIB",
+            self.version,
+            self.peer_as,
+            self.hold_time,
+            self.identifier,
+            0
+        )
 
 
 PARSERS = {
