@@ -3,6 +3,7 @@ from beeper.ip4 import ip_number_to_string, ip_string_to_number
 
 class BgpMessage(object):
     OPEN_MESSAGE = 1
+    NOTIFICATION_MESSAGE = 3
     KEEPALIVE_MESSAGE = 4
     MARKER = b"\xFF" * 16
     HEADER_LENGTH = 19
@@ -59,6 +60,32 @@ class BgpOpenMessage(BgpMessage):
             ip_number_to_string(self.identifier)
             )
 
+class BgpNotificationMessage(BgpMessage):
+    def __init__(self, error_code, error_subcode, data):
+        self.type = self.NOTIFICATION_MESSAGE
+        self.error_code = error_code
+        self.error_subcode = error_subcode
+        self.data = data
+
+    @classmethod
+    def parse(cls, serialised_message):
+        error_code, error_subcode = struct.unpack("!BB", serialised_message[:2])
+        data = serialised_message[2:]
+        return cls(error_code, error_subcode, data)
+
+    def pack(self):
+        return struct.pack("!BHHIB",
+            self.error_code,
+            self.error_subcode,
+        ) + self.data
+
+    def __str__(self):
+        return "BgpNotificationMessage: Error code: %s, Error subcode: %s, Data: %s" % (
+            self.error_code,
+            self.error_subcode,
+            self.data
+            )
+
 class BgpKeepaliveMessage(BgpMessage):
     def __init__(self):
         self.type = self.KEEPALIVE_MESSAGE
@@ -75,6 +102,7 @@ class BgpKeepaliveMessage(BgpMessage):
 
 PARSERS = {
     BgpMessage.OPEN_MESSAGE: BgpOpenMessage,
+    BgpMessage.NOTIFICATION_MESSAGE: BgpNotificationMessage,
     BgpMessage.KEEPALIVE_MESSAGE: BgpKeepaliveMessage,
 }
 
