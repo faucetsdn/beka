@@ -1,9 +1,15 @@
 from beeper.bgp_message import BgpMessage, parse_bgp_message, BgpOpenMessage, BgpKeepaliveMessage
+from beeper.nlri import IP4Prefix
+import struct
 import unittest
+
+def build_byte_string(hex_stream):
+    values = [int(x, 16) for x in map(''.join, zip(*[iter(hex_stream)]*2))]
+    return struct.pack("!" + "B" * len(values), *values)
 
 class BgpMessageTestCase(unittest.TestCase):
     def test_open_message_parses(self):
-        serialised_message = b"\x04\xfe\x09\x00\xb4\xc0\xa8\x00\x0f\x00"
+        serialised_message = build_byte_string("04fe0900b4c0a8000f00")
         message = parse_bgp_message(BgpMessage.OPEN_MESSAGE, serialised_message)
         self.assertEqual(message.version, 4)
         self.assertEqual(message.peer_as, 65033)
@@ -11,7 +17,7 @@ class BgpMessageTestCase(unittest.TestCase):
         self.assertEqual(message.identifier, 0xC0A8000F)
 
     def test_open_message_packs(self):
-        expected_serialised_message = b"\x04\xfe\x09\x00\xb4\xc0\xa8\x00\x0f\x00"
+        expected_serialised_message = build_byte_string("04fe0900b4c0a8000f00")
         message = BgpOpenMessage(4, 65033, 180, 0xC0A8000F)
         serialised_message = message.pack()
         self.assertEqual(serialised_message, expected_serialised_message)
@@ -25,3 +31,8 @@ class BgpMessageTestCase(unittest.TestCase):
         message = BgpKeepaliveMessage()
         serialised_message = message.pack()
         self.assertEqual(serialised_message, expected_serialised_message)
+
+    def test_update_message_parses(self):
+        serialised_message = build_byte_string("0000002740010101400200400304c0a800218004040000000040050400000064c00808fe0901f4fe090258080a")
+        message = parse_bgp_message(BgpMessage.UPDATE_MESSAGE, serialised_message)
+        self.assertEqual(message.nlri[0], IP4Prefix(b"\x0A\x00\x00\x00", 8))

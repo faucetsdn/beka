@@ -1,8 +1,12 @@
 import struct
 from beeper.ip4 import ip_number_to_string, ip_string_to_number
+from beeper.packing_tools import bytes_to_short, bytes_to_integer
+from beeper.nlri import parse_nlri
+from io import BytesIO
 
 class BgpMessage(object):
     OPEN_MESSAGE = 1
+    UPDATE_MESSAGE = 2
     NOTIFICATION_MESSAGE = 3
     KEEPALIVE_MESSAGE = 4
     MARKER = b"\xFF" * 16
@@ -60,6 +64,42 @@ class BgpOpenMessage(BgpMessage):
             ip_number_to_string(self.identifier)
             )
 
+class BgpUpdateMessage(BgpMessage):
+    def __init__(self, withdrawn_routes, path_attributes, nlri):
+        self.type = self.UPDATE_MESSAGE
+        self.withdrawn_routes = withdrawn_routes
+        self.path_attributes = path_attributes
+        self.nlri = nlri
+
+    @classmethod
+    def parse(cls, serialised_message):
+        data_stream = BytesIO(serialised_message)
+        # TODO route withdrawals
+        withdrawn_routes_length = bytes_to_short(data_stream.read(2))
+        serialised_withdrawn_routes = data_stream.read(withdrawn_routes_length)
+
+        # TODO path attributes
+        total_path_attribute_length = bytes_to_short(data_stream.read(2))
+        serialised_path_attributes = data_stream.read(total_path_attribute_length)
+
+        serialised_nlri = data_stream.read()
+        print("NLRI length: %d" % len(serialised_nlri))
+        nlri = parse_nlri(serialised_nlri)
+        print("NLRI: %s" % nlri)
+        # TODO nlri
+
+        return cls([], [], nlri)
+
+    def pack(self):
+        return b""
+
+    def __str__(self):
+        return "BgpUpdateMessage: Widthdrawn routes: %s, Path attributes: %s, NLRI: %s" % (
+            self.withdrawn_routes,
+            self.path_attributes,
+            self.nlri
+            )
+
 class BgpNotificationMessage(BgpMessage):
     def __init__(self, error_code, error_subcode, data):
         self.type = self.NOTIFICATION_MESSAGE
@@ -102,6 +142,7 @@ class BgpKeepaliveMessage(BgpMessage):
 
 PARSERS = {
     BgpMessage.OPEN_MESSAGE: BgpOpenMessage,
+    BgpMessage.UPDATE_MESSAGE: BgpUpdateMessage,
     BgpMessage.NOTIFICATION_MESSAGE: BgpNotificationMessage,
     BgpMessage.KEEPALIVE_MESSAGE: BgpKeepaliveMessage,
 }
