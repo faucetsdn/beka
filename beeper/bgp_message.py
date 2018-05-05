@@ -1,11 +1,22 @@
 import struct
+from beeper.ip4 import ip_number_to_string, ip_string_to_number
 
 class BgpMessage(object):
-    OPEN_MESSAGE = 2
-    KEEPALIVE_MESSAGE = 3
+    OPEN_MESSAGE = 1
+    KEEPALIVE_MESSAGE = 4
+    MARKER = b"\xFF" * 16
+    HEADER_LENGTH = 19
 
-    def __init__(self):
-        pass
+    @classmethod
+    def pack(cls, message):
+        packed_message = message.pack()
+        length = cls.HEADER_LENGTH + len(packed_message)
+        header = struct.pack("!16sHB", 
+            cls.MARKER,
+            length,
+            message.type
+            )
+        return header + packed_message
 
 def _register_parser(msg_type):
     def _register_cls_parser(cls):
@@ -23,6 +34,7 @@ class BgpOpenMessage(BgpMessage):
         self.peer_as = peer_as
         self.hold_time = hold_time
         self.identifier = identifier
+        self.type = self.OPEN_MESSAGE
 
     @classmethod
     def parse(cls, serialised_message):
@@ -39,9 +51,17 @@ class BgpOpenMessage(BgpMessage):
             0
         )
 
+    def __str__(self):
+        return "BgpOpenMessage: Version %s, Peer AS: %s, Hold time: %s, Identifier: %s" % (
+            self.version,
+            self.peer_as,
+            self.hold_time,
+            ip_number_to_string(self.identifier)
+            )
+
 class BgpKeepaliveMessage(BgpMessage):
     def __init__(self):
-        pass
+        self.type = self.KEEPALIVE_MESSAGE
 
     @classmethod
     def parse(cls, serialised_message):
@@ -49,6 +69,9 @@ class BgpKeepaliveMessage(BgpMessage):
 
     def pack(self):
         return b""
+
+    def __str__(self):
+        return "BgpKeepaliveMessage"
 
 PARSERS = {
     BgpMessage.OPEN_MESSAGE: BgpOpenMessage,

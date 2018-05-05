@@ -1,5 +1,6 @@
 from beeper.event import Event
-from beeper.message import Message
+from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpKeepaliveMessage
+from beeper.ip4 import ip_number_to_string, ip_string_to_number
 
 class Beeper:
     DEFAULT_HOLD_TIME = 60
@@ -47,14 +48,17 @@ class Beeper:
 
         # state machine
         if self.state == "active":
-            if message.type == "open":
+            if message.type == BgpMessage.OPEN_MESSAGE:
                 # process open message
                 # send open
                 # send keepalive
-                output_messages.append(Message("open"))
+                open_message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("1.2.3.4"))
+                keepalive_message = BgpKeepaliveMessage()
+                output_messages.append(open_message)
+                output_messages.append(keepalive_message)
                 self.state = "open_confirm"
         elif self.state == "open_confirm":
-            if message.type == "keepalive":
+            if message.type == BgpMessage.KEEPALIVE_MESSAGE:
                 self.state = "established"
 
         return output_messages
