@@ -1,4 +1,4 @@
-from beeper.bgp_message import BgpMessage, parse_bgp_message, BgpOpenMessage, BgpKeepaliveMessage
+from beeper.bgp_message import BgpMessage, parse_bgp_message, BgpOpenMessage, BgpNotificationMessage, BgpKeepaliveMessage
 from beeper.ip4 import IP4Prefix
 import struct
 import unittest
@@ -29,6 +29,19 @@ class BgpMessageTestCase(unittest.TestCase):
     def test_keepalive_message_packs(self):
         expected_serialised_message = b""
         message = BgpKeepaliveMessage()
+        serialised_message = message.pack()
+        self.assertEqual(serialised_message, expected_serialised_message)
+
+    def test_notification_message_parses(self):
+        serialised_message = build_byte_string("0202feb0")
+        message = parse_bgp_message(BgpMessage.NOTIFICATION_MESSAGE, serialised_message)
+        self.assertEqual(message.error_code, 2)
+        self.assertEqual(message.error_subcode, 2)
+        self.assertEqual(message.data, b"\xfe\xb0")
+
+    def test_notification_message_packs(self):
+        expected_serialised_message = build_byte_string("0202feb0")
+        message = BgpNotificationMessage(2, 2, b"\xfe\xb0")
         serialised_message = message.pack()
         self.assertEqual(serialised_message, expected_serialised_message)
 

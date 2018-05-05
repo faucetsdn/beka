@@ -2,6 +2,8 @@ from beeper.event import Event
 from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpKeepaliveMessage
 from beeper.ip4 import ip_number_to_string, ip_string_to_number
 
+import time
+
 class Beeper:
     DEFAULT_HOLD_TIME = 60
     DEFAULT_KEEPALIVE_TIME = DEFAULT_HOLD_TIME // 3
@@ -12,10 +14,13 @@ class Beeper:
         self.my_id = my_id
         self.peer_id = peer_id
         self.hold_time = hold_time
+        self.keepalive_time = hold_time // 3
+
+        tick = int(time.time())
 
         self.timers = {
-            "hold": None,
-            "keepalive": None,
+            "hold": tick + self.hold_time,
+            "keepalive": tick + self.keepalive_time,
         }
         self.state = "active"
 
@@ -28,10 +33,10 @@ class Beeper:
     def handle_timers(self, epoch):
         output_messages = []
 
-        if self.timers["hold"] < epoch:
+        if self.timers["hold"] <= epoch:
             output_messages += self.handle_hold_timer(epoch)
 
-        if self.timers["keepalive"] < epoch:
+        if self.timers["keepalive"] <= epoch:
             output_messages += self.handle_keepalive_timer(epoch)
 
         return output_messages
@@ -45,9 +50,10 @@ class Beeper:
 
     def handle_keepalive_timer(self, epoch):
         # do stuff
-        self.timers["keepalive"] = epoch + self.DEFAULT_KEEPALIVE_TIME
+        self.timers["keepalive"] = epoch + self.keepalive_time
+        message = BgpKeepaliveMessage()
 
-        return []
+        return [message]
 
     def handle_message(self, message):
         output_messages = []

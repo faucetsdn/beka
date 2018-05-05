@@ -175,7 +175,7 @@ class BgpNotificationMessage(BgpMessage):
         return cls(error_code, error_subcode, data)
 
     def pack(self):
-        return struct.pack("!BHHIB",
+        return struct.pack("!BB",
             self.error_code,
             self.error_subcode,
         ) + self.data
@@ -197,6 +197,9 @@ class BgpKeepaliveMessage(BgpMessage):
 
     def pack(self):
         return b""
+
+    def __eq__(self, other):
+        return type(other) == type(self)
 
     def __str__(self):
         return "BgpKeepaliveMessage"

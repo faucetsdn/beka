@@ -3,10 +3,11 @@ import sys
 from beeper.beeper import Beeper
 from beeper.chopper import Chopper
 from beeper.socket_io import SocketIO
-from beeper.event_message_received import EventMessageReceived
+from beeper.event import EventTimerExpired, EventMessageReceived
 from beeper.bgp_message import BgpMessage, parse_bgp_message
 
 import yaml
+import time
 
 BGP_PORT = 179
 ADDRESS = '0.0.0.0'
@@ -16,10 +17,15 @@ def printmsg(msg):
     sys.stderr.flush()
 
 def server(socket, beeper):
+    tick = int(time.time())
     input_stream = SocketIO(socket)
     chopper = Chopper(input_stream)
 
     while True:
+        tick = int(time.time())
+        printmsg("Handling timers at %d" % tick)
+        printmsg(beeper.timers)
+        output_messages = beeper.event(EventTimerExpired(tick))
         printmsg("Receiving message from chopper")
         message_type, serialised_message = chopper.next()
         printmsg("Decoding message")
@@ -27,7 +33,7 @@ def server(socket, beeper):
         printmsg(str(message))
         printmsg("Sending event to beeper")
         event = EventMessageReceived(message)
-        output_messages = beeper.event(event)
+        output_messages += beeper.event(event)
         printmsg("Messages from beeper: %s" % [str(x) for x in output_messages])
         # send them
         for message in output_messages:
