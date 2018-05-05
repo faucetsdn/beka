@@ -6,6 +6,8 @@ from beeper.socket_io import SocketIO
 from beeper.event_message_received import EventMessageReceived
 from beeper.bgp_message import BgpMessage, parse_bgp_message
 
+import yaml
+
 BGP_PORT = 179
 ADDRESS = '0.0.0.0'
 
@@ -33,8 +35,12 @@ def server(socket, beeper):
 
 
 def run():
+    printmsg("Loading config")
+    with open("beeper.yaml") as file:
+        config = yaml.load(file.read())
     printmsg("Creating beeper")
-    beeper = Beeper()
+    peer = config["peers"][0]
+    beeper = Beeper(**peer)
 
     printmsg("Creating socket")
     serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

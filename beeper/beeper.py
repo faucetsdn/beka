@@ -6,7 +6,13 @@ class Beeper:
     DEFAULT_HOLD_TIME = 60
     DEFAULT_KEEPALIVE_TIME = DEFAULT_HOLD_TIME // 3
 
-    def __init__(self):
+    def __init__(self, my_as, peer_as, my_id, peer_id, hold_time):
+        self.my_as = my_as
+        self.peer_as = peer_as
+        self.my_id = my_id
+        self.peer_id = peer_id
+        self.hold_time = hold_time
+
         self.timers = {
             "hold": None,
             "keepalive": None,
@@ -49,10 +55,8 @@ class Beeper:
         # state machine
         if self.state == "active":
             if message.type == BgpMessage.OPEN_MESSAGE:
-                # process open message
-                # send open
-                # send keepalive
-                open_message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("1.2.3.4"))
+                # TODO sanity check incoming open message
+                open_message = BgpOpenMessage(4, self.my_as, self.hold_time, ip_string_to_number(self.my_id))
                 keepalive_message = BgpKeepaliveMessage()
                 output_messages.append(open_message)
                 output_messages.append(keepalive_message)

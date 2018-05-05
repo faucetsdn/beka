@@ -143,7 +143,6 @@ class BgpUpdateMessage(BgpMessage):
         # TODO path attributes
         total_path_attribute_length = bytes_to_short(data_stream.read(2))
         serialised_path_attributes = data_stream.read(total_path_attribute_length)
-        print("Path attributes length: %d" % total_path_attribute_length)
         path_attributes = parse_path_attributes(serialised_path_attributes)
 
         serialised_nlri = data_stream.read()

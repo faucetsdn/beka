@@ -1,0 +1,6 @@
+peers:
+  - peer_id: 1.2.3.4
+    my_id: 172.17.0.1
+    peer_as: 65003
+    my_as: 65002
+    hold_time: 240
