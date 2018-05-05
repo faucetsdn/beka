@@ -1,7 +1,7 @@
 import struct
 from beeper.ip4 import ip_number_to_string, ip_string_to_number
 from beeper.packing_tools import bytes_to_short, bytes_to_integer
-from beeper.nlri import parse_nlri
+from beeper.ip4 import IP4Prefix
 from io import BytesIO
 
 class BgpMessage(object):
@@ -64,6 +64,68 @@ class BgpOpenMessage(BgpMessage):
             ip_number_to_string(self.identifier)
             )
 
+IP4_LENGTH = 4
+
+def prefix_byte_length(bit_length):
+    byte_length = bit_length // 8
+    if bit_length % 8:
+        byte_length += 1
+
+    return byte_length
+
+def pack_prefix(prefix, length):
+    return prefix[:prefix_byte_length(length)]
+
+def unpack_prefix(prefix):
+    num_extra_bytes = IP4_LENGTH - len(prefix)
+
+    if num_extra_bytes == 0:
+        return prefix
+    else:
+        return prefix + b"\x00" * num_extra_bytes
+
+def parse_nlri(serialised_nlri):
+    stream = BytesIO(serialised_nlri)
+    prefixes = []
+
+    while True:
+        serialised_length = stream.read(1)
+        if len(serialised_length) == 0:
+            break
+        prefix_length = ord(serialised_length)
+        packed_prefix = stream.read(prefix_byte_length(prefix_length))
+        prefix = unpack_prefix(packed_prefix)
+        prefixes.append(IP4Prefix(prefix, prefix_length))
+
+    return prefixes
+
+def parse_next_hop(packed_next_hop):
+    # TODO make this more meaningful than just a string
+    return "NEXT_HOP: %s" % ".".join(["%d" % x for x in packed_next_hop])
+
+attribute_parsers = {
+    3 : parse_next_hop
+}
+
+def parse_path_attributes(serialised_path_attributes):
+    stream = BytesIO(serialised_path_attributes)
+    path_attributes = []
+
+    while True:
+        attribute_header = stream.read(3)
+        if len(attribute_header) == 0:
+            break
+        flags, type_code, length = struct.unpack("!BBB", attribute_header)
+        packed_attribute = stream.read(length)
+
+        if type_code in attribute_parsers:
+            # TODO we're ignoring the flags here, these should at very least be preserved
+            path_attributes.append(attribute_parsers[type_code](packed_attribute))
+        else:
+            print("WARNING did not recognise BGP path attribute type %d" % type_code)
+
+    return path_attributes
+
 class BgpUpdateMessage(BgpMessage):
     def __init__(self, withdrawn_routes, path_attributes, nlri):
         self.type = self.UPDATE_MESSAGE
@@ -81,23 +143,23 @@ class BgpUpdateMessage(BgpMessage):
         # TODO path attributes
         total_path_attribute_length = bytes_to_short(data_stream.read(2))
         serialised_path_attributes = data_stream.read(total_path_attribute_length)
+        print("Path attributes length: %d" % total_path_attribute_length)
+        path_attributes = parse_path_attributes(serialised_path_attributes)
 
         serialised_nlri = data_stream.read()
-        print("NLRI length: %d" % len(serialised_nlri))
         nlri = parse_nlri(serialised_nlri)
-        print("NLRI: %s" % nlri)
         # TODO nlri
 
-        return cls([], [], nlri)
+        return cls([], path_attributes, nlri)
 
     def pack(self):
         return b""
 
     def __str__(self):
         return "BgpUpdateMessage: Widthdrawn routes: %s, Path attributes: %s, NLRI: %s" % (
-            self.withdrawn_routes,
-            self.path_attributes,
-            self.nlri
+            [str(x) for x in self.withdrawn_routes],
+            [str(x) for x in self.path_attributes],
+            [str(x) for x in self.nlri]
             )
 
 class BgpNotificationMessage(BgpMessage):
