@@ -99,6 +99,15 @@ def parse_nlri(serialised_nlri):
 
     return prefixes
 
+ORIGIN_CODES = {
+    0: "IGP",
+    1: "EGP",
+    2: "INCOMPLETE"
+}
+
+def parse_origin(packed_origin):
+    return ORIGIN_CODES[ord(packed_origin)]
+
 AS_SET_CODE = 1
 AS_SEQUENCE_CODE = 2
 AS_NUMBER_LENGTH = 2
@@ -123,6 +132,7 @@ def parse_next_hop(packed_next_hop):
     return "NEXT_HOP: %s" % ".".join(["%d" % x for x in packed_next_hop])
 
 attribute_parsers = {
+    1: parse_origin,
     2: parse_as_path,
     3: parse_next_hop
 }
