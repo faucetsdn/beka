@@ -99,12 +99,32 @@ def parse_nlri(serialised_nlri):
 
     return prefixes
 
+AS_SET_CODE = 1
+AS_SEQUENCE_CODE = 2
+AS_NUMBER_LENGTH = 2
+
+def parse_as_path(packed_as_path):
+    # this does as_sets wrong, assumes everything is as_sequence
+    input_stream = BytesIO(packed_as_path)
+    as_numbers = []
+    while True:
+        packed_type_and_count = input_stream.read(2)
+        if len(packed_type_and_count) == 0:
+            break
+        type_code, count = struct.unpack("!BB", packed_type_and_count)
+        if type_code == AS_SET_CODE:
+            print("WARNING received update with AS_SET, treating like AS_SEQUENCE")
+        packed_as_sequence = input_stream.read(count * AS_NUMBER_LENGTH)
+        as_numbers += struct.unpack("!" + ("H" * count), packed_as_sequence)
+    return "AS_PATH: %s" % " ".join(["%d" % x for x in as_numbers])
+
 def parse_next_hop(packed_next_hop):
     # TODO make this more meaningful than just a string
     return "NEXT_HOP: %s" % ".".join(["%d" % x for x in packed_next_hop])
 
 attribute_parsers = {
-    3 : parse_next_hop
+    2: parse_as_path,
+    3: parse_next_hop
 }
 
 def parse_path_attributes(serialised_path_attributes):
