@@ -1,6 +1,7 @@
 from beeper.event import Event
 from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpKeepaliveMessage
 from beeper.ip4 import ip_number_to_string, ip_string_to_number
+from beeper.route import Route
 from collections import deque
 
 import time
@@ -17,6 +18,7 @@ class Beeper:
         self.hold_time = hold_time
         self.keepalive_time = hold_time // 3
         self.output_messages = deque()
+        self.route_updates = deque()
 
         tick = int(time.time())
 
@@ -62,4 +64,8 @@ class Beeper:
         elif self.state == "open_confirm":
             if message.type == BgpMessage.KEEPALIVE_MESSAGE:
                 self.state = "established"
+        if message.type == BgpMessage.UPDATE_MESSAGE:
+            for prefix in message.nlri:
+                route = Route(prefix, message.path_attributes["next_hop"], message.path_attributes["as_path"], message.path_attributes["origin"])
+                self.route_updates.append(route)
 
