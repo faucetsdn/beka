@@ -125,11 +125,11 @@ def parse_as_path(packed_as_path):
             print("WARNING received update with AS_SET, treating like AS_SEQUENCE")
         packed_as_sequence = input_stream.read(count * AS_NUMBER_LENGTH)
         as_numbers += struct.unpack("!" + ("H" * count), packed_as_sequence)
-    return "AS_PATH: %s" % " ".join(["%d" % x for x in as_numbers])
+    return " ".join(["%d" % x for x in as_numbers])
 
 def parse_next_hop(packed_next_hop):
     # TODO make this more meaningful than just a string
-    return "NEXT_HOP: %s" % ".".join(["%d" % x for x in packed_next_hop])
+    return ".".join(["%d" % x for x in packed_next_hop])
 
 attribute_parsers = {
     1: parse_origin,
@@ -137,9 +137,15 @@ attribute_parsers = {
     3: parse_next_hop
 }
 
+attribute_keys = {
+    1: "origin",
+    2: "as_path",
+    3: "next_hop"
+}
+
 def parse_path_attributes(serialised_path_attributes):
     stream = BytesIO(serialised_path_attributes)
-    path_attributes = []
+    path_attributes = {}
 
     while True:
         attribute_header = stream.read(3)
@@ -150,7 +156,8 @@ def parse_path_attributes(serialised_path_attributes):
 
         if type_code in attribute_parsers:
             # TODO we're ignoring the flags here, these should at very least be preserved
-            path_attributes.append(attribute_parsers[type_code](packed_attribute))
+            # this is tightly coupled, there's gotta be a better way to do this
+            path_attributes[attribute_keys[type_code]] = attribute_parsers[type_code](packed_attribute)
         else:
             print("WARNING did not recognise BGP path attribute type %d" % type_code)
 
@@ -187,7 +194,7 @@ class BgpUpdateMessage(BgpMessage):
     def __str__(self):
         return "BgpUpdateMessage: Widthdrawn routes: %s, Path attributes: %s, NLRI: %s" % (
             [str(x) for x in self.withdrawn_routes],
-            [str(x) for x in self.path_attributes],
+            self.path_attributes,
             [str(x) for x in self.nlri]
             )
 

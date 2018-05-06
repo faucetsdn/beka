@@ -49,4 +49,5 @@ class BgpMessageTestCase(unittest.TestCase):
         serialised_message = build_byte_string("0000002740010101400200400304c0a800218004040000000040050400000064c00808fe0901f4fe090258080a")
         message = parse_bgp_message(BgpMessage.UPDATE_MESSAGE, serialised_message)
         self.assertEqual(message.nlri[0], IP4Prefix(b"\x0A\x00\x00\x00", 8))
-        self.assertEqual(message.path_attributes[0], "NEXT_HOP: 192.168.0.33")
+        self.assertEqual(message.path_attributes["next_hop"], "192.168.0.33")
+        self.assertEqual(message.path_attributes["origin"], "EGP")
