@@ -177,14 +177,12 @@ class BgpUpdateMessage(BgpMessage):
         withdrawn_routes_length = bytes_to_short(data_stream.read(2))
         serialised_withdrawn_routes = data_stream.read(withdrawn_routes_length)
 
-        # TODO path attributes
         total_path_attribute_length = bytes_to_short(data_stream.read(2))
         serialised_path_attributes = data_stream.read(total_path_attribute_length)
         path_attributes = parse_path_attributes(serialised_path_attributes)
 
         serialised_nlri = data_stream.read()
         nlri = parse_nlri(serialised_nlri)
-        # TODO nlri
 
         return cls([], path_attributes, nlri)
 
