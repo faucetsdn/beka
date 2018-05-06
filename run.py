@@ -40,6 +40,11 @@ def server(socket, beeper):
             message = beeper.output_messages.popleft()
             socket.send(BgpMessage.pack(message))
 
+        # print route updates
+        while len(beeper.route_updates) > 0:
+            route = beeper.route_updates.popleft()
+            printmsg("New route received: %s" % route)
+
 
 def run():
     printmsg("Loading config")
