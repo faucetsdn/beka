@@ -7,7 +7,7 @@ from collections import deque
 import time
 
 class Beeper:
-    DEFAULT_HOLD_TIME = 60
+    DEFAULT_HOLD_TIME = 240
     DEFAULT_KEEPALIVE_TIME = DEFAULT_HOLD_TIME // 3
 
     def __init__(self, my_as, peer_as, my_id, peer_id, hold_time):
@@ -20,39 +20,37 @@ class Beeper:
         self.output_messages = deque()
         self.route_updates = deque()
 
-        tick = int(time.time())
-
         self.timers = {
-            "hold": tick + self.hold_time,
-            "keepalive": tick + self.keepalive_time,
+            "hold": None,
+            "keepalive": None,
         }
         self.state = "active"
 
-    def event(self, event):
+    def event(self, event, tick):
         if event.type == Event.TIMER_EXPIRED:
-            self.handle_timers(event.epoch)
+            self.handle_timers(tick)
         elif event.type == Event.MESSAGE_RECEIVED:
-            self.handle_message(event.message)
+            self.handle_message(event.message, tick)
 
-    def handle_timers(self, epoch):
-        if self.timers["hold"] <= epoch:
-            self.handle_hold_timer(epoch)
+    def handle_timers(self, tick):
+        if self.timers["hold"] + self.hold_time <= tick:
+            self.handle_hold_timer(tick)
 
-        if self.timers["keepalive"] <= epoch:
-            self.handle_keepalive_timer(epoch)
+        if self.timers["keepalive"] + self.keepalive_time <= tick:
+            self.handle_keepalive_timer(tick)
 
-    def handle_hold_timer(self, epoch):
+    def handle_hold_timer(self, tick):
         # do stuff
         # should be state check too
         self.state = "active"
 
-    def handle_keepalive_timer(self, epoch):
+    def handle_keepalive_timer(self, tick):
         # do stuff
-        self.timers["keepalive"] = epoch + self.keepalive_time
+        self.timers["keepalive"] = tick
         message = BgpKeepaliveMessage()
         self.output_messages.append(message)
 
-    def handle_message(self, message):# state machine
+    def handle_message(self, message, tick):# state machine
         if self.state == "active":
             if message.type == BgpMessage.OPEN_MESSAGE:
                 # TODO sanity check incoming open message

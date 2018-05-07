@@ -25,7 +25,7 @@ def server(socket, beeper):
         tick = int(time.time())
         printmsg("Handling timers at %d" % tick)
         printmsg(beeper.timers)
-        beeper.event(EventTimerExpired(tick))
+        beeper.event(EventTimerExpired(), tick)
         printmsg("Receiving message from chopper")
         message_type, serialised_message = chopper.next()
         printmsg("Decoding message")
@@ -33,7 +33,7 @@ def server(socket, beeper):
         printmsg(str(message))
         printmsg("Sending event to beeper")
         event = EventMessageReceived(message)
-        beeper.event(event)
+        beeper.event(event, tick)
         printmsg("Messages from beeper: %s" % [str(x) for x in beeper.output_messages])
         # send them
         while len(beeper.output_messages) > 0:
