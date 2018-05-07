@@ -197,7 +197,7 @@ class BgpUpdateMessage(BgpMessage):
             )
 
 class BgpNotificationMessage(BgpMessage):
-    def __init__(self, error_code, error_subcode, data):
+    def __init__(self, error_code, error_subcode=0, data=b""):
         self.type = self.NOTIFICATION_MESSAGE
         self.error_code = error_code
         self.error_subcode = error_subcode
