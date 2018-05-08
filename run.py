@@ -1,13 +1,14 @@
-import socket
-import sys
 from beeper.beeper import Beeper
 from beeper.chopper import Chopper
 from beeper.socket_io import SocketIO
 from beeper.event import EventTimerExpired, EventMessageReceived
 from beeper.bgp_message import BgpMessage, parse_bgp_message
 
+import sys
 import yaml
 import time
+
+from gevent.server import StreamServer
 
 BGP_PORT = 179
 ADDRESS = '0.0.0.0'
@@ -16,7 +17,7 @@ def printmsg(msg):
     sys.stderr.write("%s\n" % msg)
     sys.stderr.flush()
 
-def server(socket, beeper):
+def fsm(socket, beeper):
     tick = int(time.time())
     input_stream = SocketIO(socket)
     chopper = Chopper(input_stream)
@@ -45,30 +46,23 @@ def server(socket, beeper):
             route = beeper.route_updates.popleft()
             printmsg("New route received: %s" % route)
 
-
-def run():
-    printmsg("Loading config")
-    with open("beeper.yaml") as file:
-        config = yaml.load(file.read())
-    printmsg("Creating beeper")
-    peer = config["peers"][0]
-    beeper = Beeper(**peer)
-
-    printmsg("Creating socket")
-    serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    serversocket.bind((ADDRESS, BGP_PORT))
-    serversocket.listen(5)
-
-    while True:
-        (clientsocket, address) = serversocket.accept()
+class Server(object):
+    def handle(self, socket, address):
         printmsg("Accepted connection from %s" % str(address))
-        server(clientsocket, beeper)
-        clientsocket.shutdown(socket.SHUT_RDWR)
-        clientsocket.close()
-        break
+        fsm(socket, self.beeper)
 
-    serversocket.shutdown(socket.SHUT_RDWR)
-    serversocket.close()
+    def run(self):
+        printmsg("Loading config")
+        with open("beeper.yaml") as file:
+            self.config = yaml.load(file.read())
+        printmsg("Creating beeper")
+        self.peer = self.config["peers"][0]
+        self.beeper = Beeper(**self.peer)
+
+        printmsg("Creating socket")
+        server = StreamServer((ADDRESS, BGP_PORT), self.handle)
+        server.serve_forever()
 
 if __name__ == "__main__":
-    run()
+    server = Server()
+    server.run()
