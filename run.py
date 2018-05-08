@@ -35,15 +35,16 @@ def fsm(socket, beeper):
         printmsg("Sending event to beeper")
         event = EventMessageReceived(message)
         beeper.event(event, tick)
-        printmsg("Messages from beeper: %s" % [str(x) for x in beeper.output_messages])
+        printmsg("Messages from beeper:")
         # send them
-        while len(beeper.output_messages) > 0:
-            message = beeper.output_messages.popleft()
+        while beeper.output_messages.qsize() > 0:
+            message = beeper.output_messages.get()
+            printmsg(message)
             socket.send(BgpMessage.pack(message))
 
         # print route updates
-        while len(beeper.route_updates) > 0:
-            route = beeper.route_updates.popleft()
+        while beeper.route_updates.qsize() > 0:
+            route = beeper.route_updates.get()
             printmsg("New route received: %s" % route)
 
 class Server(object):

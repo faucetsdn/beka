@@ -14,7 +14,7 @@ class BeeperPassiveActiveTestCase(unittest.TestCase):
         self.old_hold_timer = self.beeper.timers["hold"]
         self.old_keepalive_timer = self.beeper.timers["keepalive"]
         self.assertEqual(self.beeper.state, "active")
-        self.assertEqual(len(self.beeper.output_messages), 0)
+        self.assertEqual(self.beeper.output_messages.qsize(), 0)
 
     def test_shutdown_message_advances_to_idle(self):
         self.beeper.event(EventShutdown(), self.tick)
@@ -26,16 +26,16 @@ class BeeperPassiveActiveTestCase(unittest.TestCase):
         self.assertEqual(self.beeper.state, "active")
         self.assertEqual(self.old_hold_timer, self.beeper.timers["hold"])
         self.assertEqual(self.old_keepalive_timer, self.beeper.timers["keepalive"])
-        self.assertEqual(len(self.beeper.output_messages), 0)
-        self.assertEqual(len(self.beeper.route_updates), 0)
+        self.assertEqual(self.beeper.output_messages.qsize(), 0)
+        self.assertEqual(self.beeper.route_updates.qsize(), 0)
 
     def test_open_message_advances_to_open_confirm_and_sets_timers(self):
         message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "open_confirm")
-        self.assertEqual(len(self.beeper.output_messages), 2)
-        self.assertEqual(self.beeper.output_messages[0].type, BgpMessage.OPEN_MESSAGE)
-        self.assertEqual(self.beeper.output_messages[1].type, BgpMessage.KEEPALIVE_MESSAGE)
+        self.assertEqual(self.beeper.output_messages.qsize(), 2)
+        self.assertEqual(self.beeper.output_messages.get().type, BgpMessage.OPEN_MESSAGE)
+        self.assertEqual(self.beeper.output_messages.get().type, BgpMessage.KEEPALIVE_MESSAGE)
         self.assertEqual(self.beeper.timers["hold"], self.tick)
         self.assertEqual(self.beeper.timers["keepalive"], self.tick)
 
@@ -66,15 +66,16 @@ class BeeperOpenConfirmTestCase(unittest.TestCase):
         message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "open_confirm")
-        self.beeper.output_messages.clear()
+        for _ in range(self.beeper.output_messages.qsize()):
+            self.beeper.output_messages.get()
         self.old_hold_timer = self.beeper.timers["hold"]
         self.old_keepalive_timer = self.beeper.timers["keepalive"]
 
     def test_shutdown_message_advances_to_idle_and_sends_notification(self):
         self.beeper.event(EventShutdown(), self.tick)
         self.assertEqual(self.beeper.state, "idle")
-        self.assertEqual(len(self.beeper.output_messages), 1)
-        message = self.beeper.output_messages[0]
+        self.assertEqual(self.beeper.output_messages.qsize(), 1)
+        message = self.beeper.output_messages.get()
         self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 6) # Cease
 
@@ -83,8 +84,8 @@ class BeeperOpenConfirmTestCase(unittest.TestCase):
         self.beeper.timers["hold"] = self.tick - 3600
         self.beeper.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.beeper.state, "idle")
-        self.assertEqual(len(self.beeper.output_messages), 1)
-        message = self.beeper.output_messages[0]
+        self.assertEqual(self.beeper.output_messages.qsize(), 1)
+        message = self.beeper.output_messages.get()
         self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 4) # Hold Timer Expired
 
@@ -92,8 +93,8 @@ class BeeperOpenConfirmTestCase(unittest.TestCase):
         self.beeper.timers["keepalive"] = self.tick - 3600
         self.beeper.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.beeper.state, "open_confirm")
-        self.assertEqual(len(self.beeper.output_messages), 1)
-        message = self.beeper.output_messages[0]
+        self.assertEqual(self.beeper.output_messages.qsize(), 1)
+        message = self.beeper.output_messages.get()
         self.assertEqual(message.type, BgpMessage.KEEPALIVE_MESSAGE)
         self.assertEqual(self.beeper.timers["keepalive"], self.tick)
 
@@ -113,8 +114,8 @@ class BeeperOpenConfirmTestCase(unittest.TestCase):
         message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
-        self.assertEqual(len(self.beeper.output_messages), 1)
-        message = self.beeper.output_messages[0]
+        self.assertEqual(self.beeper.output_messages.qsize(), 1)
+        message = self.beeper.output_messages.get()
         self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 6) # Cease
 
@@ -127,8 +128,8 @@ class BeeperOpenConfirmTestCase(unittest.TestCase):
         message = BgpUpdateMessage([], path_attributes, [IP4Prefix("192.168.0.0", 16)])
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
-        self.assertEqual(len(self.beeper.output_messages), 1)
-        message = self.beeper.output_messages[0]
+        self.assertEqual(self.beeper.output_messages.qsize(), 1)
+        message = self.beeper.output_messages.get()
         self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 5) # FSM error
 
@@ -138,7 +139,8 @@ class BeeperEstablishedTestCase(unittest.TestCase):
         self.beeper = Beeper(my_as=65001, peer_as=65002, my_id="1.1.1.1", peer_id="2.2.2.2", hold_time=240)
         message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
-        self.beeper.output_messages.clear()
+        for _ in range(self.beeper.output_messages.qsize()):
+            self.beeper.output_messages.get()
         message = BgpKeepaliveMessage()
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "established")
@@ -149,8 +151,8 @@ class BeeperEstablishedTestCase(unittest.TestCase):
         self.beeper.timers["keepalive"] = self.tick - 3600
         self.beeper.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.beeper.state, "established")
-        self.assertEqual(len(self.beeper.output_messages), 1)
-        message = self.beeper.output_messages[0]
+        self.assertEqual(self.beeper.output_messages.qsize(), 1)
+        message = self.beeper.output_messages.get()
         self.assertEqual(message.type, BgpMessage.KEEPALIVE_MESSAGE)
         self.assertEqual(self.beeper.timers["keepalive"], self.tick)
 
@@ -169,14 +171,14 @@ class BeeperEstablishedTestCase(unittest.TestCase):
         message = BgpUpdateMessage([], path_attributes, [IP4Prefix("192.168.0.0", 16)])
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "established")
-        self.assertEqual(len(self.beeper.route_updates), 1)
-        self.assertEqual(self.beeper.route_updates[0], Route(**route_attributes))
+        self.assertEqual(self.beeper.route_updates.qsize(), 1)
+        self.assertEqual(self.beeper.route_updates.get(), Route(**route_attributes))
 
     def test_shutdown_message_advances_to_idle_and_sends_notification(self):
         self.beeper.event(EventShutdown(), self.tick)
         self.assertEqual(self.beeper.state, "idle")
-        self.assertEqual(len(self.beeper.output_messages), 1)
-        message = self.beeper.output_messages[0]
+        self.assertEqual(self.beeper.output_messages.qsize(), 1)
+        message = self.beeper.output_messages.get()
         self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 6) # Cease
 
@@ -185,8 +187,8 @@ class BeeperEstablishedTestCase(unittest.TestCase):
         self.beeper.timers["hold"] = self.tick - 3600
         self.beeper.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.beeper.state, "idle")
-        self.assertEqual(len(self.beeper.output_messages), 1)
-        message = self.beeper.output_messages[0]
+        self.assertEqual(self.beeper.output_messages.qsize(), 1)
+        message = self.beeper.output_messages.get()
         self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 4) # Hold Timer Expired
 
@@ -199,7 +201,7 @@ class BeeperEstablishedTestCase(unittest.TestCase):
         message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
-        self.assertEqual(len(self.beeper.output_messages), 1)
-        message = self.beeper.output_messages[0]
+        self.assertEqual(self.beeper.output_messages.qsize(), 1)
+        message = self.beeper.output_messages.get()
         self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 6) # Cease
