@@ -38,7 +38,7 @@ class Beeper:
 
     def handle_shutdown(self):
         if self.state == "open_confirm" or self.state == "established":
-            notification_message = BgpNotificationMessage(6)
+            notification_message = BgpNotificationMessage(BgpNotificationMessage.CEASE)
             self.output_messages.put(notification_message)
         self.shutdown()
 
@@ -53,7 +53,7 @@ class Beeper:
                 self.handle_keepalive_timer(tick)
 
     def handle_hold_timer(self, tick):
-        notification_message = BgpNotificationMessage(4)
+        notification_message = BgpNotificationMessage(BgpNotificationMessage.HOLD_TIMER_EXPIRED)
         self.output_messages.put(notification_message)
         self.shutdown()
 
@@ -90,11 +90,11 @@ class Beeper:
         elif message.type == BgpMessage.NOTIFICATION_MESSAGE:
             self.shutdown()
         elif message.type == BgpMessage.OPEN_MESSAGE:
-            notification_message = BgpNotificationMessage(6)
+            notification_message = BgpNotificationMessage(BgpNotificationMessage.CEASE)
             self.output_messages.put(notification_message)
             self.shutdown()
         elif message.type == BgpMessage.UPDATE_MESSAGE:
-            notification_message = BgpNotificationMessage(5)
+            notification_message = BgpNotificationMessage(BgpNotificationMessage.FINITE_STATE_MACHINE_ERROR)
             self.output_messages.put(notification_message)
             self.shutdown()
 
@@ -106,7 +106,7 @@ class Beeper:
         elif message.type == BgpMessage.NOTIFICATION_MESSAGE:
             self.shutdown()
         elif message.type == BgpMessage.OPEN_MESSAGE:
-            notification_message = BgpNotificationMessage(6)
+            notification_message = BgpNotificationMessage(BgpNotificationMessage.CEASE)
             self.output_messages.put(notification_message)
             self.shutdown()
 

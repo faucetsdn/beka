@@ -248,6 +248,13 @@ class BgpUpdateMessage(BgpMessage):
             )
 
 class BgpNotificationMessage(BgpMessage):
+    MESSAGE_HEADER_ERROR = 1
+    OPEN_MESSAGE_ERROR = 2
+    UPDATE_MESSAGE_ERROR = 3
+    HOLD_TIMER_EXPIRED = 4
+    FINITE_STATE_MACHINE_ERROR = 5
+    CEASE = 6
+
     def __init__(self, error_code, error_subcode=0, data=b""):
         self.type = self.NOTIFICATION_MESSAGE
         self.error_code = error_code
