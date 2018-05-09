@@ -1,6 +1,6 @@
 from beeper.event import Event
 from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpKeepaliveMessage, BgpNotificationMessage
-from beeper.route import Route
+from beeper.route import RouteAddition, RouteRemoval
 from beeper.ip import IPAddress
 from queue import Queue
 
@@ -113,7 +113,7 @@ class Beeper:
     def process_route_update(self, update_message):
         # we handle both v4 and v6 here, in theory - this shouldn't happen in the real world though right?
         for prefix in update_message.nlri:
-            route = Route(
+            route = RouteAddition(
                 prefix,
                 update_message.path_attributes["next_hop"],
                 update_message.path_attributes["as_path"],
@@ -122,12 +122,18 @@ class Beeper:
             self.route_updates.put(route)
         if "mp_reach_nlri" in update_message.path_attributes:
             for prefix in update_message.path_attributes["mp_reach_nlri"]["nlri"]:
-                route = Route(
+                route = RouteAddition(
                     prefix,
                     update_message.path_attributes["mp_reach_nlri"]["next_hop"]["afi"],
                     update_message.path_attributes["as_path"],
                     update_message.path_attributes["origin"]
                 )
                 self.route_updates.put(route)
+        for withdrawal in update_message.withdrawn_routes:
+            route = RouteRemoval(
+                withdrawal
+            )
+            self.route_updates.put(route)
+
 
 

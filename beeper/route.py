@@ -1,4 +1,4 @@
-class Route:
+class RouteAddition:
     def __init__(self, prefix, next_hop, as_path, origin):
         self.prefix = prefix
         self.next_hop = next_hop
@@ -13,3 +13,13 @@ class Route:
             self.next_hop == other.next_hop and \
             self.as_path == other.as_path and \
             self.origin == other.origin
+
+class RouteRemoval:
+    def __init__(self, prefix):
+        self.prefix = prefix
+
+    def __str__(self):
+        return str(self.prefix)
+
+    def __eq__(self, other):
+        return self.prefix == other.prefix

@@ -2,6 +2,7 @@ from beeper.beeper import Beeper
 from beeper.chopper import Chopper
 from beeper.event import EventTimerExpired, EventMessageReceived
 from beeper.bgp_message import BgpMessage, parse_bgp_message
+from beeper.route import RouteAddition, RouteRemoval
 from beeper.error import SocketClosedError
 
 import sys
@@ -39,9 +40,7 @@ class Peering(object):
         self.greenlets.append(spawn(self.kick_timers))
         self.greenlets.append(spawn(self.receive_messages))
 
-        #self.printmsg("Made greenlets, doing a joinall()")
         joinall(self.greenlets)
-        #self.printmsg("Peering closed")
 
     def receive_messages(self):
         while True:
@@ -49,11 +48,9 @@ class Peering(object):
             try:
                 message_type, serialised_message = self.chopper.next()
             except SocketClosedError as e:
-                #self.printmsg("Socket closed: %s" % e)
                 killall(self.greenlets)
                 break
             message = parse_bgp_message(message_type, serialised_message)
-            #self.printmsg("Received message %s" % str(message))
             event = EventMessageReceived(message)
             tick = int(time.time())
             self.beeper.event(event, tick)
@@ -63,7 +60,6 @@ class Peering(object):
             sleep(0)
             if self.beeper.output_messages.qsize() > 0:
                 message = self.beeper.output_messages.get()
-                #self.printmsg("Sending message: %s" % str(message))
                 self.socket.send(BgpMessage.pack(message))
 
     def print_route_updates(self):
@@ -71,8 +67,10 @@ class Peering(object):
             sleep(0)
             if self.beeper.route_updates.qsize() > 0:
                 route = self.beeper.route_updates.get()
-                self.route_handler("%s: New route received: %s" % (self.peer_address, route))
-                #self.printmsg("New route received: %s" % route)
+                if type(route) == RouteAddition:
+                    self.route_handler("%s: New route received: %s" % (self.peer_address, route))
+                elif type(route) == RouteRemoval:
+                    self.route_handler("%s: Route removed: %s" % (self.peer_address, route))
 
     def kick_timers(self):
         while True:

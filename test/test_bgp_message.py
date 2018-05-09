@@ -47,12 +47,17 @@ class BgpMessageTestCase(unittest.TestCase):
         serialised_message = message.pack()
         self.assertEqual(serialised_message, expected_serialised_message)
 
-    def test_update_message_parses(self):
+    def test_update_message_new_routes_parses(self):
         serialised_message = build_byte_string("0000002740010101400200400304c0a800218004040000000040050400000064c00808fe0901f4fe090258080a")
         message = parse_bgp_message(BgpMessage.UPDATE_MESSAGE, serialised_message)
-        self.assertEqual(message.nlri[0], IP4Prefix(b"\x0A\x00\x00\x00", 8))
+        self.assertEqual(message.nlri[0], IP4Prefix.from_string("10.0.0.0/8"))
         self.assertEqual(message.path_attributes["next_hop"], IP4Address.from_string("192.168.0.33"))
         self.assertEqual(message.path_attributes["origin"], "EGP")
+
+    def test_update_message_withdrawn_routes_parses(self):
+        serialised_message = build_byte_string("0004180a01010000")
+        message = parse_bgp_message(BgpMessage.UPDATE_MESSAGE, serialised_message)
+        self.assertEqual(message.withdrawn_routes[0], IP4Prefix.from_string("10.1.1.0/24"))
 
     def test_update_v6_message_parses(self):
         serialised_message = build_byte_string("0000004b400101004002040201fdeb800e3d0002012020010db80001000000000242ac110002fe800000000000000042acfffe110002007f20010db40000000000000000000000002f20010db30000")

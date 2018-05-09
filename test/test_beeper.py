@@ -3,7 +3,7 @@ from beeper.beeper import Beeper
 from beeper.event import Event, EventTimerExpired, EventMessageReceived, EventShutdown
 from beeper.ip4 import IP4Prefix, IP4Address
 from beeper.ip6 import IP6Prefix, IP6Address
-from beeper.route import Route
+from beeper.route import RouteAddition, RouteRemoval
 
 import time
 import unittest
@@ -174,7 +174,14 @@ class BeeperEstablishedTestCase(unittest.TestCase):
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "established")
         self.assertEqual(self.beeper.route_updates.qsize(), 1)
-        self.assertEqual(self.beeper.route_updates.get(), Route(**route_attributes))
+        self.assertEqual(self.beeper.route_updates.get(), RouteAddition(**route_attributes))
+
+    def test_update_message_removes_route(self):
+        message = BgpUpdateMessage([IP4Prefix.from_string("192.168.0.0/16")], [], [])
+        self.beeper.event(EventMessageReceived(message), self.tick)
+        self.assertEqual(self.beeper.state, "established")
+        self.assertEqual(self.beeper.route_updates.qsize(), 1)
+        self.assertEqual(self.beeper.route_updates.get(), RouteRemoval(IP4Prefix.from_string("192.168.0.0/16")))
 
     def test_update_v6_message_adds_route(self):
         path_attributes = {
@@ -200,7 +207,7 @@ class BeeperEstablishedTestCase(unittest.TestCase):
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "established")
         self.assertEqual(self.beeper.route_updates.qsize(), 1)
-        self.assertEqual(self.beeper.route_updates.get(), Route(**route_attributes))
+        self.assertEqual(self.beeper.route_updates.get(), RouteAddition(**route_attributes))
 
     def test_shutdown_message_advances_to_idle_and_sends_notification(self):
         self.beeper.event(EventShutdown(), self.tick)

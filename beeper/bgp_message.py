@@ -214,6 +214,21 @@ def parse_path_attributes(serialised_path_attributes):
 
     return path_attributes
 
+def parse_widthdrawn_routes(serialised_withdrawn_routes):
+    stream = BytesIO(serialised_withdrawn_routes)
+    prefixes = []
+
+    while True:
+        serialised_length = stream.read(1)
+        if len(serialised_length) == 0:
+            break
+        prefix_length = ord(serialised_length)
+        packed_prefix = stream.read(prefix_byte_length(prefix_length))
+        prefix = unpack_prefix(packed_prefix)
+        prefixes.append(IP4Prefix(prefix, prefix_length))
+
+    return prefixes
+
 class BgpUpdateMessage(BgpMessage):
     def __init__(self, withdrawn_routes, path_attributes, nlri):
         self.type = self.UPDATE_MESSAGE
@@ -224,9 +239,9 @@ class BgpUpdateMessage(BgpMessage):
     @classmethod
     def parse(cls, serialised_message):
         data_stream = BytesIO(serialised_message)
-        # TODO route withdrawals
         withdrawn_routes_length = bytes_to_short(data_stream.read(2))
         serialised_withdrawn_routes = data_stream.read(withdrawn_routes_length)
+        withdrawn_routes = parse_widthdrawn_routes(serialised_withdrawn_routes)
 
         total_path_attribute_length = bytes_to_short(data_stream.read(2))
         serialised_path_attributes = data_stream.read(total_path_attribute_length)
@@ -235,7 +250,7 @@ class BgpUpdateMessage(BgpMessage):
         serialised_nlri = data_stream.read()
         nlri = parse_nlri(serialised_nlri)
 
-        return cls([], path_attributes, nlri)
+        return cls(withdrawn_routes, path_attributes, nlri)
 
     def pack(self):
         return b""
