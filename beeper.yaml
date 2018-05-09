@@ -1,6 +1,13 @@
 peers:
-  - peer_id: 1.2.3.4
-    my_id: 172.17.0.1
+  - neighbor: 172.25.0.111
+    local_address: 172.25.0.1
+    router_id: 172.25.0.1
     peer_as: 65003
-    my_as: 65002
+    local_as: 65002
+    hold_time: 240
+  - neighbor: "2001:db9:1::99"
+    local_address: "2001:db9:1::1"
+    router_id: 172.25.0.1
+    peer_as: 65003
+    local_as: 65002
     hold_time: 240

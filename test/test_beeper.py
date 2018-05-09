@@ -1,16 +1,18 @@
 from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage, BgpKeepaliveMessage, BgpNotificationMessage
 from beeper.beeper import Beeper
 from beeper.event import Event, EventTimerExpired, EventMessageReceived, EventShutdown
-from beeper.ip4 import ip_string_to_number, IP4Prefix
+from beeper.ip4 import IP4Prefix, IP4Address
+from beeper.ip6 import IP6Prefix, IP6Address
 from beeper.route import Route
 
 import time
 import unittest
+import socket
 
 class BeeperPassiveActiveTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
-        self.beeper = Beeper(my_as=65001, peer_as=65002, my_id="1.1.1.1", peer_id="2.2.2.2", hold_time=240)
+        self.beeper = Beeper(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
         self.old_hold_timer = self.beeper.timers["hold"]
         self.old_keepalive_timer = self.beeper.timers["keepalive"]
         self.assertEqual(self.beeper.state, "active")
@@ -30,7 +32,7 @@ class BeeperPassiveActiveTestCase(unittest.TestCase):
         self.assertEqual(self.beeper.route_updates.qsize(), 0)
 
     def test_open_message_advances_to_open_confirm_and_sets_timers(self):
-        message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "open_confirm")
         self.assertEqual(self.beeper.output_messages.qsize(), 2)
@@ -51,19 +53,19 @@ class BeeperPassiveActiveTestCase(unittest.TestCase):
 
     def test_update_message_advances_to_idle(self):
         path_attributes = {
-            "next_hop" : "5.4.3.2",
+            "next_hop" : IP4Address.from_string("5.4.3.2"),
             "as_path" : "65032 65011 65002",
             "origin" : "EGP"
             }
-        message = BgpUpdateMessage([], path_attributes, [IP4Prefix("192.168.0.0", 16)])
+        message = BgpUpdateMessage([], path_attributes, [IP4Prefix.from_string("192.168.0.0/16")])
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
 
 class BeeperOpenConfirmTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
-        self.beeper = Beeper(my_as=65001, peer_as=65002, my_id="1.1.1.1", peer_id="2.2.2.2", hold_time=240)
-        message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
+        self.beeper = Beeper(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "open_confirm")
         for _ in range(self.beeper.output_messages.qsize()):
@@ -111,7 +113,7 @@ class BeeperOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.beeper.timers["hold"], self.tick)
 
     def test_open_message_advances_to_idle_and_sends_notification(self):
-        message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
         self.assertEqual(self.beeper.output_messages.qsize(), 1)
@@ -121,11 +123,11 @@ class BeeperOpenConfirmTestCase(unittest.TestCase):
 
     def test_update_message_advances_to_idle(self):
         path_attributes = {
-            "next_hop" : "5.4.3.2",
+            "next_hop" : IP4Address.from_string("5.4.3.2"),
             "as_path" : "65032 65011 65002",
             "origin" : "EGP"
             }
-        message = BgpUpdateMessage([], path_attributes, [IP4Prefix("192.168.0.0", 16)])
+        message = BgpUpdateMessage([], path_attributes, [IP4Prefix.from_string("192.168.0.0/16")])
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
         self.assertEqual(self.beeper.output_messages.qsize(), 1)
@@ -136,8 +138,8 @@ class BeeperOpenConfirmTestCase(unittest.TestCase):
 class BeeperEstablishedTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
-        self.beeper = Beeper(my_as=65001, peer_as=65002, my_id="1.1.1.1", peer_id="2.2.2.2", hold_time=240)
-        message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
+        self.beeper = Beeper(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         for _ in range(self.beeper.output_messages.qsize()):
             self.beeper.output_messages.get()
@@ -158,17 +160,43 @@ class BeeperEstablishedTestCase(unittest.TestCase):
 
     def test_update_message_adds_route(self):
         path_attributes = {
-            "next_hop" : "5.4.3.2",
+            "next_hop" : IP4Address.from_string("5.4.3.2"),
             "as_path" : "65032 65011 65002",
             "origin" : "EGP"
-            }
+        }
         route_attributes = {
-            "prefix" : IP4Prefix("192.168.0.0", 16),
-            "next_hop" : "5.4.3.2",
+            "prefix" : IP4Prefix.from_string("192.168.0.0/16"),
+            "next_hop" : IP4Address.from_string("5.4.3.2"),
             "as_path" : "65032 65011 65002",
             "origin" : "EGP"
+        }
+        message = BgpUpdateMessage([], path_attributes, [IP4Prefix.from_string("192.168.0.0/16")])
+        self.beeper.event(EventMessageReceived(message), self.tick)
+        self.assertEqual(self.beeper.state, "established")
+        self.assertEqual(self.beeper.route_updates.qsize(), 1)
+        self.assertEqual(self.beeper.route_updates.get(), Route(**route_attributes))
+
+    def test_update_v6_message_adds_route(self):
+        path_attributes = {
+            "as_path" : "65032 65011 65002",
+            "origin" : "EGP",
+            "mp_reach_nlri" : {
+                "next_hop" : {
+                    "afi" : IP6Address.from_string("2001:db8:1::242:ac11:2"),
+                    "safi" : IP6Address.from_string("fe80::42:acff:fe11:2"),
+                },
+                "nlri" : [
+                    IP6Prefix.from_string("2001:db4::/127"),
+                ]
             }
-        message = BgpUpdateMessage([], path_attributes, [IP4Prefix("192.168.0.0", 16)])
+        }
+        route_attributes = {
+            "prefix" : IP6Prefix.from_string("2001:db4::/127"),
+            "next_hop" : IP6Address.from_string("2001:db8:1::242:ac11:2"),
+            "as_path" : "65032 65011 65002",
+            "origin" : "EGP"
+        }
+        message = BgpUpdateMessage([], path_attributes, [])
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "established")
         self.assertEqual(self.beeper.route_updates.qsize(), 1)
@@ -198,7 +226,7 @@ class BeeperEstablishedTestCase(unittest.TestCase):
         self.assertEqual(self.beeper.state, "idle")
 
     def test_open_message_advances_to_idle_and_sends_notification(self):
-        message = BgpOpenMessage(4, 65002, 240, ip_string_to_number("2.2.2.2"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
         self.assertEqual(self.beeper.output_messages.qsize(), 1)

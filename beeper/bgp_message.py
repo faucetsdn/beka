@@ -1,7 +1,8 @@
 import struct
-from beeper.ip4 import ip_number_to_string, ip_string_to_number
+import socket
 from beeper.packing_tools import bytes_to_short, bytes_to_integer
-from beeper.ip4 import IP4Prefix
+from beeper.ip4 import IP4Prefix, IP4Address
+from beeper.ip6 import IP6Prefix, IP6Address
 from io import BytesIO
 
 class BgpMessage(object):
@@ -44,15 +45,15 @@ class BgpOpenMessage(BgpMessage):
     @classmethod
     def parse(cls, serialised_message):
         # we ignore optional parameters
-        version, peer_as, hold_time, identifier, optional_parameters_length = struct.unpack("!BHHIB", serialised_message[:10])
-        return cls(version, peer_as, hold_time, identifier)
+        version, peer_as, hold_time, identifier, optional_parameters_length = struct.unpack("!BHH4sB", serialised_message[:10])
+        return cls(version, peer_as, hold_time, IP4Address(identifier))
 
     def pack(self):
-        return struct.pack("!BHHIB",
+        return struct.pack("!BHH4sB",
             self.version,
             self.peer_as,
             self.hold_time,
-            self.identifier,
+            self.identifier.address,
             0
         )
 
@@ -61,7 +62,7 @@ class BgpOpenMessage(BgpMessage):
             self.version,
             self.peer_as,
             self.hold_time,
-            ip_number_to_string(self.identifier)
+            self.identifier
             )
 
 IP4_LENGTH = 4
@@ -128,19 +129,69 @@ def parse_as_path(packed_as_path):
     return " ".join(["%d" % x for x in as_numbers])
 
 def parse_next_hop(packed_next_hop):
-    # TODO make this more meaningful than just a string
-    return ".".join(["%d" % x for x in packed_next_hop])
+    return IP4Address(packed_next_hop)
+
+IP6_AFI = 2
+UNICAST_SAFI = 1
+IP6_UNICAST_LENGTH = 32
+
+IP6_LENGTH = 16
+
+def unpack_prefix6(prefix):
+    num_extra_bytes = IP6_LENGTH - len(prefix)
+
+    if num_extra_bytes == 0:
+        return prefix
+    else:
+        return prefix + b"\x00" * num_extra_bytes
+
+def parse_nlri6(stream):
+    prefixes = []
+
+    while True:
+        serialised_length = stream.read(1)
+        if len(serialised_length) == 0:
+            break
+        prefix_length = ord(serialised_length)
+        packed_prefix = stream.read(prefix_byte_length(prefix_length))
+        prefix = unpack_prefix6(packed_prefix)
+        prefixes.append(IP6Prefix(prefix, prefix_length))
+
+    return prefixes
+
+def parse_mp_reach_nlri(packed_mp_reach_nlri):
+    attributes = {}
+    stream = BytesIO(packed_mp_reach_nlri)
+    afi, safi, next_hop_length = struct.unpack("!HBB", stream.read(4))
+    if afi != IP6_AFI:
+        raise ValueError("MP_REACH_NLRI: Got unsupported AFI: %d" % afi)
+    if safi != UNICAST_SAFI:
+        raise ValueError("MP_REACH_NLRI: Got unsupported SAFI: %d" % safi)
+    if next_hop_length != IP6_UNICAST_LENGTH:
+        raise ValueError("MP_REACH_NLRI: Got unsupported next hop length: %d" % next_hop_length)
+
+    attributes["next_hop"] = {}
+    attributes["next_hop"]["afi"] = IP6Address(struct.unpack("!16s", stream.read(IP6_LENGTH))[0])
+    attributes["next_hop"]["safi"] = IP6Address(struct.unpack("!16s", stream.read(IP6_LENGTH))[0])
+
+    _reserved_snpa = stream.read(1)
+
+    attributes["nlri"] = parse_nlri6(stream)
+
+    return attributes
 
 attribute_parsers = {
     1: parse_origin,
     2: parse_as_path,
-    3: parse_next_hop
+    3: parse_next_hop,
+    14: parse_mp_reach_nlri,
 }
 
 attribute_keys = {
     1: "origin",
     2: "as_path",
-    3: "next_hop"
+    3: "next_hop",
+    14: "mp_reach_nlri",
 }
 
 def parse_path_attributes(serialised_path_attributes):

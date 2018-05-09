@@ -1,4 +1,5 @@
 import struct
+from beeper.error import SocketClosedError
 
 class Chopper(object):
     BGP_MARKER = b"\xFF" * 16
@@ -18,6 +19,8 @@ class Chopper(object):
         extra_data_length = length - self.HEADER_LENGTH
         if extra_data_length > 0:
             serialised_body = self.input_stream.read(extra_data_length)
+            if len(serialised_body) < extra_data_length:
+                raise SocketClosedError("Tried to read %d bytes but only got %d" % (extra_data_length, len(header)))
         elif extra_data_length < 0:
             raise ValueError("Invalid BGP length field")
         else:
@@ -28,6 +31,8 @@ class Chopper(object):
     def load_header(self):
         # TODO handle when stream runs out
         header = self.input_stream.read(19)
+        if len(header) < 19:
+            raise SocketClosedError("Tried to read %d bytes but only got %d" % (19, len(header)))
 
         marker, length, message_type = struct.unpack("!16sHB", header)
 

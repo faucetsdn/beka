@@ -1,20 +1,22 @@
 from beeper.event import Event
 from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpKeepaliveMessage, BgpNotificationMessage
-from beeper.ip4 import ip_number_to_string, ip_string_to_number
 from beeper.route import Route
+from beeper.ip import IPAddress
 from queue import Queue
 
+import socket
 import time
 
 class Beeper:
     DEFAULT_HOLD_TIME = 240
     DEFAULT_KEEPALIVE_TIME = DEFAULT_HOLD_TIME // 3
 
-    def __init__(self, my_as, peer_as, my_id, peer_id, hold_time):
-        self.my_as = my_as
+    def __init__(self, local_as, peer_as, router_id, local_address, neighbor, hold_time):
+        self.local_as = local_as
         self.peer_as = peer_as
-        self.my_id = my_id
-        self.peer_id = peer_id
+        self.router_id = IPAddress.from_string(router_id)
+        self.local_address = IPAddress.from_string(local_address)
+        self.neighbor = IPAddress.from_string(neighbor)
         self.hold_time = hold_time
         self.keepalive_time = hold_time // 3
         self.output_messages = Queue()
@@ -71,7 +73,7 @@ class Beeper:
     def handle_message_active_state(self, message, tick):
         if message.type == BgpMessage.OPEN_MESSAGE:
             # TODO sanity check incoming open message
-            open_message = BgpOpenMessage(4, self.my_as, self.hold_time, ip_string_to_number(self.my_id))
+            open_message = BgpOpenMessage(4, self.local_as, self.hold_time, self.router_id)
             keepalive_message = BgpKeepaliveMessage()
             self.output_messages.put(open_message)
             self.output_messages.put(keepalive_message)
@@ -109,8 +111,23 @@ class Beeper:
             self.shutdown()
 
     def process_route_update(self, update_message):
+        # we handle both v4 and v6 here, in theory - this shouldn't happen in the real world though right?
         for prefix in update_message.nlri:
-            route = Route(prefix, update_message.path_attributes["next_hop"], update_message.path_attributes["as_path"], update_message.path_attributes["origin"])
+            route = Route(
+                prefix,
+                update_message.path_attributes["next_hop"],
+                update_message.path_attributes["as_path"],
+                update_message.path_attributes["origin"]
+            )
             self.route_updates.put(route)
+        if "mp_reach_nlri" in update_message.path_attributes:
+            for prefix in update_message.path_attributes["mp_reach_nlri"]["nlri"]:
+                route = Route(
+                    prefix,
+                    update_message.path_attributes["mp_reach_nlri"]["next_hop"]["afi"],
+                    update_message.path_attributes["as_path"],
+                    update_message.path_attributes["origin"]
+                )
+                self.route_updates.put(route)
 
 

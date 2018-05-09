@@ -12,4 +12,4 @@ class Route:
         return self.prefix == other.prefix and \
             self.next_hop == other.next_hop and \
             self.as_path == other.as_path and \
-            self.origin == other.origin \
+            self.origin == other.origin
