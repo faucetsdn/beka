@@ -1,11 +1,10 @@
-from beeper.event import Event
-from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpKeepaliveMessage, BgpNotificationMessage
-from beeper.route import RouteAddition, RouteRemoval
-from beeper.ip import IPAddress
 from gevent.queue import Queue
 
-import socket
-import time
+from beeper.event import Event
+from beeper.bgp_message import BgpMessage, BgpOpenMessage
+from beeper.bgp_message import BgpKeepaliveMessage, BgpNotificationMessage
+from beeper.route import RouteAddition, RouteRemoval
+from beeper.ip import IPAddress
 
 class StateMachine:
     DEFAULT_HOLD_TIME = 240
@@ -48,11 +47,11 @@ class StateMachine:
     def handle_timers(self, tick):
         if self.state == "open_confirm" or self.state == "established":
             if self.timers["hold"] + self.hold_time <= tick:
-                self.handle_hold_timer(tick)
+                self.handle_hold_timer()
             elif self.timers["keepalive"] + self.keepalive_time <= tick:
                 self.handle_keepalive_timer(tick)
 
-    def handle_hold_timer(self, tick):
+    def handle_hold_timer(self):
         notification_message = BgpNotificationMessage(BgpNotificationMessage.HOLD_TIMER_EXPIRED)
         self.output_messages.put(notification_message)
         self.shutdown()
@@ -94,7 +93,8 @@ class StateMachine:
             self.output_messages.put(notification_message)
             self.shutdown()
         elif message.type == BgpMessage.UPDATE_MESSAGE:
-            notification_message = BgpNotificationMessage(BgpNotificationMessage.FINITE_STATE_MACHINE_ERROR)
+            notification_message = BgpNotificationMessage(
+                BgpNotificationMessage.FINITE_STATE_MACHINE_ERROR)
             self.output_messages.put(notification_message)
             self.shutdown()
 
@@ -111,7 +111,8 @@ class StateMachine:
             self.shutdown()
 
     def process_route_update(self, update_message):
-        # we handle both v4 and v6 here, in theory - this shouldn't happen in the real world though right?
+        # we handle both v4 and v6 here, in theory
+        # this shouldn't happen in the real world though right?
         for prefix in update_message.nlri:
             route = RouteAddition(
                 prefix,
@@ -140,6 +141,3 @@ class StateMachine:
                     withdrawal
                 )
                 self.route_updates.put(route)
-
-
-

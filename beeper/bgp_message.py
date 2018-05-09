@@ -17,22 +17,13 @@ class BgpMessage(object):
     def pack(cls, message):
         packed_message = message.pack()
         length = cls.HEADER_LENGTH + len(packed_message)
-        header = struct.pack("!16sHB", 
+        header = struct.pack(
+            "!16sHB",
             cls.MARKER,
             length,
             message.type
             )
         return header + packed_message
-
-def _register_parser(msg_type):
-    def _register_cls_parser(cls):
-        cls.cls_msg_type = msg_type
-        return cls
-    return _set_cls_msg_type
-
-def _register_parser(cls):
-    BgpMessage.PARSERS[cls.cls_msg_type] = cls.parser
-    return cls
 
 class BgpOpenMessage(BgpMessage):
     def __init__(self, version, peer_as, hold_time, identifier):
@@ -45,11 +36,15 @@ class BgpOpenMessage(BgpMessage):
     @classmethod
     def parse(cls, serialised_message):
         # we ignore optional parameters
-        version, peer_as, hold_time, identifier, optional_parameters_length = struct.unpack("!BHH4sB", serialised_message[:10])
+        version, peer_as, hold_time, identifier, _optional_parameters_length = struct.unpack(
+            "!BHH4sB",
+            serialised_message[:10]
+        )
         return cls(version, peer_as, hold_time, IP4Address(identifier))
 
     def pack(self):
-        return struct.pack("!BHH4sB",
+        return struct.pack(
+            "!BHH4sB",
             self.version,
             self.peer_as,
             self.hold_time,
@@ -82,8 +77,8 @@ def unpack_prefix(prefix):
 
     if num_extra_bytes == 0:
         return prefix
-    else:
-        return prefix + b"\x00" * num_extra_bytes
+
+    return prefix + b"\x00" * num_extra_bytes
 
 def parse_nlri(serialised_nlri):
     stream = BytesIO(serialised_nlri)
@@ -142,8 +137,8 @@ def unpack_prefix6(prefix):
 
     if num_extra_bytes == 0:
         return prefix
-    else:
-        return prefix + b"\x00" * num_extra_bytes
+
+    return prefix + b"\x00" * num_extra_bytes
 
 def parse_nlri6(stream):
     prefixes = []
@@ -298,7 +293,8 @@ class BgpNotificationMessage(BgpMessage):
         return cls(error_code, error_subcode, data)
 
     def pack(self):
-        return struct.pack("!BB",
+        return struct.pack(
+            "!BB",
             self.error_code,
             self.error_subcode,
         ) + self.data

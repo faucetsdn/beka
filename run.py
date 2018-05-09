@@ -25,7 +25,14 @@ class Server(object):
 
         for address, peers in peers_per_address.items():
             printmsg("Starting Beeper on %s" % address)
-            beeper = Beeper(address, peers, self.peer_up_handler, self.peer_down_handler, self.route_handler, self.error_handler)
+            beeper = Beeper(
+                address,
+                peers,
+                self.peer_up_handler,
+                self.peer_down_handler,
+                self.route_handler,
+                self.error_handler
+            )
             self.greenlets.append(spawn(beeper.run))
         joinall(self.greenlets)
 
