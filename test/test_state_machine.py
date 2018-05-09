@@ -1,5 +1,5 @@
 from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage, BgpKeepaliveMessage, BgpNotificationMessage
-from beeper.beeper import Beeper
+from beeper.state_machine import StateMachine
 from beeper.event import Event, EventTimerExpired, EventMessageReceived, EventShutdown
 from beeper.ip4 import IP4Prefix, IP4Address
 from beeper.ip6 import IP6Prefix, IP6Address
@@ -9,10 +9,10 @@ import time
 import unittest
 import socket
 
-class BeeperPassiveActiveTestCase(unittest.TestCase):
+class StateMachinePassiveActiveTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
-        self.beeper = Beeper(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
+        self.beeper = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
         self.old_hold_timer = self.beeper.timers["hold"]
         self.old_keepalive_timer = self.beeper.timers["keepalive"]
         self.assertEqual(self.beeper.state, "active")
@@ -61,10 +61,10 @@ class BeeperPassiveActiveTestCase(unittest.TestCase):
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
 
-class BeeperOpenConfirmTestCase(unittest.TestCase):
+class StateMachineOpenConfirmTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
-        self.beeper = Beeper(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
+        self.beeper = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
         message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "open_confirm")
@@ -135,10 +135,10 @@ class BeeperOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 5) # FSM error
 
-class BeeperEstablishedTestCase(unittest.TestCase):
+class StateMachineEstablishedTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
-        self.beeper = Beeper(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
+        self.beeper = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
         message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         for _ in range(self.beeper.output_messages.qsize()):

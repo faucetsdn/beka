@@ -1,145 +1,99 @@
-from beeper.event import Event
-from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpKeepaliveMessage, BgpNotificationMessage
-from beeper.route import RouteAddition, RouteRemoval
-from beeper.ip import IPAddress
+from gevent.server import StreamServer
+from gevent import spawn, sleep, joinall, killall
 from gevent.queue import Queue
 
-import socket
+from beeper.state_machine import StateMachine
+from beeper.chopper import Chopper
+from beeper.event import EventTimerExpired, EventMessageReceived
+from beeper.bgp_message import BgpMessage, parse_bgp_message
+from beeper.route import RouteAddition, RouteRemoval
+from beeper.error import SocketClosedError
+
 import time
 
-class Beeper:
-    DEFAULT_HOLD_TIME = 240
-    DEFAULT_KEEPALIVE_TIME = DEFAULT_HOLD_TIME // 3
+BGP_PORT = 179
 
-    def __init__(self, local_as, peer_as, router_id, local_address, neighbor, hold_time):
-        self.local_as = local_as
-        self.peer_as = peer_as
-        self.router_id = IPAddress.from_string(router_id)
-        self.local_address = IPAddress.from_string(local_address)
-        self.neighbor = IPAddress.from_string(neighbor)
-        self.hold_time = hold_time
-        self.keepalive_time = hold_time // 3
-        self.output_messages = Queue()
-        self.route_updates = Queue()
+class Peering(object):
+    def __init__(self, beeper, peer_address, socket, route_handler):
+        self.beeper = beeper
+        self.peer_address = peer_address[0]
+        self.peer_port = peer_address[1]
+        self.socket = socket
+        self.route_handler = route_handler
 
-        self.timers = {
-            "hold": None,
-            "keepalive": None,
-        }
-        self.state = "active"
+    def run(self):
+        self.input_stream = self.socket.makefile(mode="rb")
+        self.chopper = Chopper(self.input_stream)
+        self.greenlets = []
 
-    def event(self, event, tick):
-        if event.type == Event.TIMER_EXPIRED:
-            self.handle_timers(tick)
-        elif event.type == Event.MESSAGE_RECEIVED:
-            self.handle_message(event.message, tick)
-        elif event.type == Event.SHUTDOWN:
-            self.handle_shutdown()
+        self.greenlets.append(spawn(self.send_messages))
+        self.greenlets.append(spawn(self.print_route_updates))
+        self.greenlets.append(spawn(self.kick_timers))
+        self.greenlets.append(spawn(self.receive_messages))
 
-    def handle_shutdown(self):
-        if self.state == "open_confirm" or self.state == "established":
-            notification_message = BgpNotificationMessage(BgpNotificationMessage.CEASE)
-            self.output_messages.put(notification_message)
-        self.shutdown()
+        joinall(self.greenlets)
 
-    def shutdown(self):
-        self.state = "idle"
+    def receive_messages(self):
+        while True:
+            sleep(0)
+            try:
+                message_type, serialised_message = self.chopper.next()
+            except SocketClosedError as e:
+                killall(self.greenlets)
+                break
+            message = parse_bgp_message(message_type, serialised_message)
+            event = EventMessageReceived(message)
+            tick = int(time.time())
+            self.beeper.event(event, tick)
 
-    def handle_timers(self, tick):
-        if self.state == "open_confirm" or self.state == "established":
-            if self.timers["hold"] + self.hold_time <= tick:
-                self.handle_hold_timer(tick)
-            elif self.timers["keepalive"] + self.keepalive_time <= tick:
-                self.handle_keepalive_timer(tick)
+    def send_messages(self):
+        while True:
+            sleep(0)
+            message = self.beeper.output_messages.get()
+            self.socket.send(BgpMessage.pack(message))
 
-    def handle_hold_timer(self, tick):
-        notification_message = BgpNotificationMessage(BgpNotificationMessage.HOLD_TIMER_EXPIRED)
-        self.output_messages.put(notification_message)
-        self.shutdown()
+    def print_route_updates(self):
+        while True:
+            sleep(0)
+            route = self.beeper.route_updates.get()
+            if type(route) == RouteAddition:
+                self.route_handler("%s: New route received: %s" % (self.peer_address, route))
+            elif type(route) == RouteRemoval:
+                self.route_handler("%s: Route removed: %s" % (self.peer_address, route))
 
-    def handle_keepalive_timer(self, tick):
-        self.timers["keepalive"] = tick
-        message = BgpKeepaliveMessage()
-        self.output_messages.put(message)
+    def kick_timers(self):
+        while True:
+            sleep(1)
+            tick = int(time.time())
+            self.beeper.event(EventTimerExpired(), tick)
 
-    def handle_message(self, message, tick):# state machine
-        if self.state == "active":
-            self.handle_message_active_state(message, tick)
-        elif self.state == "open_confirm":
-            self.handle_message_open_confirm_state(message, tick)
-        elif self.state == "established":
-            self.handle_message_established_state(message, tick)
+class Beeper(object):
+    def __init__(self, local_address, peers, peer_up_handler, peer_down_handler, route_handler, error_handler):
+        self.local_address = local_address
+        self.peers_by_neighbor = {}
+        self.peerings = []
+        self.peer_up_handler = peer_up_handler
+        self.peer_down_handler = peer_down_handler
+        self.route_handler = route_handler
+        self.error_handler = error_handler
 
-    def handle_message_active_state(self, message, tick):
-        if message.type == BgpMessage.OPEN_MESSAGE:
-            # TODO sanity check incoming open message
-            open_message = BgpOpenMessage(4, self.local_as, self.hold_time, self.router_id)
-            keepalive_message = BgpKeepaliveMessage()
-            self.output_messages.put(open_message)
-            self.output_messages.put(keepalive_message)
-            self.timers["hold"] = tick
-            self.timers["keepalive"] = tick
-            self.state = "open_confirm"
-        else:
-            self.shutdown()
+        for peer in peers:
+            self.peers_by_neighbor[peer["neighbor"]] = peer
 
-    def handle_message_open_confirm_state(self, message, tick):
-        if message.type == BgpMessage.KEEPALIVE_MESSAGE:
-            self.timers["hold"] = tick
-            self.state = "established"
-        elif message.type == BgpMessage.NOTIFICATION_MESSAGE:
-            self.shutdown()
-        elif message.type == BgpMessage.OPEN_MESSAGE:
-            notification_message = BgpNotificationMessage(BgpNotificationMessage.CEASE)
-            self.output_messages.put(notification_message)
-            self.shutdown()
-        elif message.type == BgpMessage.UPDATE_MESSAGE:
-            notification_message = BgpNotificationMessage(BgpNotificationMessage.FINITE_STATE_MACHINE_ERROR)
-            self.output_messages.put(notification_message)
-            self.shutdown()
+    def run(self):
+        stream_server = StreamServer((self.local_address, BGP_PORT), self.handle)
+        stream_server.serve_forever()
 
-    def handle_message_established_state(self, message, tick):
-        if message.type == BgpMessage.UPDATE_MESSAGE:
-            self.process_route_update(message)
-        elif message.type == BgpMessage.KEEPALIVE_MESSAGE:
-            self.timers["hold"] = tick
-        elif message.type == BgpMessage.NOTIFICATION_MESSAGE:
-            self.shutdown()
-        elif message.type == BgpMessage.OPEN_MESSAGE:
-            notification_message = BgpNotificationMessage(BgpNotificationMessage.CEASE)
-            self.output_messages.put(notification_message)
-            self.shutdown()
-
-    def process_route_update(self, update_message):
-        # we handle both v4 and v6 here, in theory - this shouldn't happen in the real world though right?
-        for prefix in update_message.nlri:
-            route = RouteAddition(
-                prefix,
-                update_message.path_attributes["next_hop"],
-                update_message.path_attributes["as_path"],
-                update_message.path_attributes["origin"]
-            )
-            self.route_updates.put(route)
-        if "mp_reach_nlri" in update_message.path_attributes:
-            for prefix in update_message.path_attributes["mp_reach_nlri"]["nlri"]:
-                route = RouteAddition(
-                    prefix,
-                    update_message.path_attributes["mp_reach_nlri"]["next_hop"]["afi"],
-                    update_message.path_attributes["as_path"],
-                    update_message.path_attributes["origin"]
-                )
-                self.route_updates.put(route)
-        for withdrawal in update_message.withdrawn_routes:
-            route = RouteRemoval(
-                withdrawal
-            )
-            self.route_updates.put(route)
-        if "mp_unreach_nlri" in update_message.path_attributes:
-            for withdrawal in update_message.path_attributes["mp_unreach_nlri"]["withdrawn_routes"]:
-                route = RouteRemoval(
-                    withdrawal
-                )
-                self.route_updates.put(route)
-
-
-
+    def handle(self, socket, address):
+        neighbor = address[0]
+        if neighbor not in self.peers_by_neighbor:
+            self.error_handler("Rejecting connection from %s:%d" % address)
+            socket.close()
+            return
+        beeper = StateMachine(**self.peers_by_neighbor[neighbor])
+        peering = Peering(beeper, address, socket, self.route_handler)
+        self.peerings.append(peering)
+        self.peer_up_handler("Peer up %s" % neighbor)
+        peering.run()
+        self.peer_down_handler("Peer down %s" % neighbor)
+        self.peerings.remove(peering)
