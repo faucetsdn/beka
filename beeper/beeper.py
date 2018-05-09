@@ -134,6 +134,12 @@ class Beeper:
                 withdrawal
             )
             self.route_updates.put(route)
+        if "mp_unreach_nlri" in update_message.path_attributes:
+            for withdrawal in update_message.path_attributes["mp_unreach_nlri"]["withdrawn_routes"]:
+                route = RouteRemoval(
+                    withdrawal
+                )
+                self.route_updates.put(route)
 
 
 

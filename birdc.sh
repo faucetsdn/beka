@@ -1,0 +1,1 @@
+ssh $1 'sudo birdc -s /tmp/bird/bird.ctl'

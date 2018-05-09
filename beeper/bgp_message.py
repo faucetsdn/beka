@@ -180,11 +180,25 @@ def parse_mp_reach_nlri(packed_mp_reach_nlri):
 
     return attributes
 
+def parse_mp_unreach_nlri(packed_mp_reach_nlri):
+    attributes = {}
+    stream = BytesIO(packed_mp_reach_nlri)
+    afi, safi = struct.unpack("!HB", stream.read(3))
+    if afi != IP6_AFI:
+        raise ValueError("MP_UNREACH_NLRI: Got unsupported AFI: %d" % afi)
+    if safi != UNICAST_SAFI:
+        raise ValueError("MP_UNREACH_NLRI: Got unsupported SAFI: %d" % safi)
+
+    attributes["withdrawn_routes"] = parse_nlri6(stream)
+
+    return attributes
+
 attribute_parsers = {
     1: parse_origin,
     2: parse_as_path,
     3: parse_next_hop,
     14: parse_mp_reach_nlri,
+    15: parse_mp_unreach_nlri,
 }
 
 attribute_keys = {
@@ -192,6 +206,7 @@ attribute_keys = {
     2: "as_path",
     3: "next_hop",
     14: "mp_reach_nlri",
+    15: "mp_unreach_nlri",
 }
 
 def parse_path_attributes(serialised_path_attributes):
