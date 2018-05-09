@@ -11,7 +11,7 @@ import time
 
 from gevent.server import StreamServer
 from gevent import spawn, sleep, joinall, killall
-from queue import Queue
+from gevent.queue import Queue
 
 BGP_PORT = 179
 
@@ -58,19 +58,17 @@ class Peering(object):
     def send_messages(self):
         while True:
             sleep(0)
-            if self.beeper.output_messages.qsize() > 0:
-                message = self.beeper.output_messages.get()
-                self.socket.send(BgpMessage.pack(message))
+            message = self.beeper.output_messages.get()
+            self.socket.send(BgpMessage.pack(message))
 
     def print_route_updates(self):
         while True:
             sleep(0)
-            if self.beeper.route_updates.qsize() > 0:
-                route = self.beeper.route_updates.get()
-                if type(route) == RouteAddition:
-                    self.route_handler("%s: New route received: %s" % (self.peer_address, route))
-                elif type(route) == RouteRemoval:
-                    self.route_handler("%s: Route removed: %s" % (self.peer_address, route))
+            route = self.beeper.route_updates.get()
+            if type(route) == RouteAddition:
+                self.route_handler("%s: New route received: %s" % (self.peer_address, route))
+            elif type(route) == RouteRemoval:
+                self.route_handler("%s: Route removed: %s" % (self.peer_address, route))
 
     def kick_timers(self):
         while True:

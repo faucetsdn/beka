@@ -2,7 +2,7 @@ from beeper.event import Event
 from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpKeepaliveMessage, BgpNotificationMessage
 from beeper.route import RouteAddition, RouteRemoval
 from beeper.ip import IPAddress
-from queue import Queue
+from gevent.queue import Queue
 
 import socket
 import time
