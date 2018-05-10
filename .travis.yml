@@ -1,0 +1,10 @@
+dist: trusty
+language: python
+python:
+  - '3.6'
+cache:
+  pip: true
+install:
+  - pip3 install -q -r requirements.txt
+script:
+  - ./run_tests.sh
