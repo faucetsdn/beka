@@ -35,7 +35,7 @@ class Peering(object):
             try:
                 message_type, serialised_message = self.chopper.next()
             except SocketClosedError as e:
-                killall(self.greenlets)
+                self.shutdown()
                 break
             message = parse_bgp_message(message_type, serialised_message)
             event = EventMessageReceived(message)
@@ -62,3 +62,6 @@ class Peering(object):
             sleep(1)
             tick = int(time.time())
             self.state_machine.event(EventTimerExpired(), tick)
+
+    def shutdown(self):
+        killall(self.greenlets)
