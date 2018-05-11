@@ -37,12 +37,13 @@ class Beeper(object):
             self.error_handler("Rejecting connection from %s:%d" % address)
             socket.close()
             return
-        state_machine = StateMachine(**self.peers_by_neighbor[neighbor])
+        peer = self.peers_by_neighbor[neighbor]
+        state_machine = StateMachine(**peer)
         peering = Peering(state_machine, address, socket, self.route_handler)
         self.peerings.append(peering)
-        self.peer_up_handler("Peer up %s" % neighbor)
+        self.peer_up_handler(neighbor, peer["peer_as"])
         peering.run()
-        self.peer_down_handler("Peer down %s" % neighbor)
+        self.peer_down_handler(neighbor, peer["peer_as"])
         self.peerings.remove(peering)
 
     def shutdown(self):

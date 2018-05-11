@@ -41,7 +41,7 @@ class Server(object):
             self.beepers.append(beeper)
             self.greenlets.append(spawn(beeper.run))
         joinall(self.greenlets)
-        printmsg("All greenelets gone, exiting")
+        printmsg("All greenlets gone, exiting")
 
     def signal_handler(self, _signal, _frame):
         printmsg("[SIGINT] Shutting down")
@@ -52,17 +52,20 @@ class Server(object):
             printmsg("Shutting down Beeper %s" % beeper)
             beeper.shutdown()
 
-    def peer_up_handler(self, msg):
-        printmsg("[Peer up] %s" % msg)
+    def peer_up_handler(self, peer_ip, peer_as):
+        printmsg("[Peer up] %s %d" % (peer_ip, peer_as))
 
-    def peer_down_handler(self, msg):
-        printmsg("[Peer down] %s" % msg)
+    def peer_down_handler(self, peer_ip, peer_as):
+        printmsg("[Peer down] %s %s" % (peer_ip, peer_as))
 
     def error_handler(self, msg):
         printmsg("[Error] %s" % msg)
 
-    def route_handler(self, msg):
-        printmsg("[Route handler] %s" % msg)
+    def route_handler(self, route_update):
+        if route_update.is_withdraw:
+            printmsg("[Route handler] Route removed: %s" % route_update)
+        else:
+            printmsg("[Route handler] New route received: %s" % route_update)
 
 if __name__ == "__main__":
     server = Server()

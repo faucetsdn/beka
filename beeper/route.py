@@ -4,6 +4,7 @@ class RouteAddition:
         self.next_hop = next_hop
         self.as_path = as_path
         self.origin = origin
+        self.is_withdraw = False
 
     def __str__(self):
         return "%s via %s (%s) %s" % (self.prefix, self.next_hop, self.as_path, self.origin)
@@ -17,6 +18,7 @@ class RouteAddition:
 class RouteRemoval:
     def __init__(self, prefix):
         self.prefix = prefix
+        self.is_withdraw = True
 
     def __str__(self):
         return str(self.prefix)

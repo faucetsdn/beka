@@ -51,11 +51,8 @@ class Peering(object):
     def print_route_updates(self):
         while True:
             sleep(0)
-            route = self.state_machine.route_updates.get()
-            if isinstance(route, RouteAddition):
-                self.route_handler("%s: New route received: %s" % (self.peer_address, route))
-            elif isinstance(route, RouteRemoval):
-                self.route_handler("%s: Route removed: %s" % (self.peer_address, route))
+            route_update = self.state_machine.route_updates.get()
+            self.route_handler(route_update)
 
     def kick_timers(self):
         while True:
