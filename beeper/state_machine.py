@@ -1,10 +1,10 @@
 from gevent.queue import Queue
 
-from beeper.event import Event
-from beeper.bgp_message import BgpMessage, BgpOpenMessage
-from beeper.bgp_message import BgpKeepaliveMessage, BgpNotificationMessage
-from beeper.route import RouteAddition, RouteRemoval
-from beeper.ip import IPAddress
+from .event import Event
+from .bgp_message import BgpMessage, BgpOpenMessage
+from .bgp_message import BgpKeepaliveMessage, BgpNotificationMessage
+from .route import RouteAddition, RouteRemoval
+from .ip import IPAddress
 
 class StateMachine:
     DEFAULT_HOLD_TIME = 240

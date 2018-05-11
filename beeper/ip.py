@@ -1,5 +1,5 @@
-from beeper.ip4 import IP4Address
-from beeper.ip6 import IP6Address
+from .ip4 import IP4Address
+from .ip6 import IP6Address
 
 class IPAddress:
     @staticmethod

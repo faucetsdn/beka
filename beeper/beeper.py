@@ -1,8 +1,8 @@
 from gevent.pool import Pool
 from gevent.server import StreamServer
 
-from beeper.state_machine import StateMachine
-from beeper.peering import Peering
+from .state_machine import StateMachine
+from .peering import Peering
 
 DEFAULT_BGP_PORT = 179
 

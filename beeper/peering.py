@@ -1,11 +1,11 @@
 from gevent import spawn, sleep, joinall, killall
 from gevent.queue import Queue
 
-from beeper.chopper import Chopper
-from beeper.event import EventTimerExpired, EventMessageReceived
-from beeper.bgp_message import BgpMessage, parse_bgp_message
-from beeper.route import RouteAddition, RouteRemoval
-from beeper.error import SocketClosedError
+from .chopper import Chopper
+from .event import EventTimerExpired, EventMessageReceived
+from .bgp_message import BgpMessage, parse_bgp_message
+from .route import RouteAddition, RouteRemoval
+from .error import SocketClosedError
 
 import time
 

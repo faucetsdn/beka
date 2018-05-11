@@ -1,5 +1,5 @@
 import struct
-from beeper.error import SocketClosedError
+from .error import SocketClosedError
 
 class Chopper(object):
     BGP_MARKER = b"\xFF" * 16

@@ -1,8 +1,8 @@
 import struct
 import socket
-from beeper.packing_tools import bytes_to_short, bytes_to_integer
-from beeper.ip4 import IP4Prefix, IP4Address
-from beeper.ip6 import IP6Prefix, IP6Address
+from .packing_tools import bytes_to_short, bytes_to_integer
+from .ip4 import IP4Prefix, IP4Address
+from .ip6 import IP6Prefix, IP6Address
 from io import BytesIO
 
 class BgpMessage(object):
