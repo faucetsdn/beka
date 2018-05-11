@@ -21,23 +21,24 @@ class Server(object):
 
         with open("beeper.yaml") as file:
             config = yaml.load(file.read())
-        peers_per_address = {}
-        for peer in config["peers"]:
-            if peer["local_address"] not in peers_per_address:
-                peers_per_address[peer["local_address"]] = []
-            peers_per_address[peer["local_address"]].append(peer)
-
-        for address, peers in peers_per_address.items():
-            printmsg("Starting Beeper on %s" % address)
+        for router in config["routers"]:
+            printmsg("Starting Beeper on %s" % router["local_address"])
             beeper = Beeper(
-                address,
-                None,
-                peers,
+                router["local_address"],
+                router["bgp_port"],
+                router["local_as"],
+                router["router_id"],
                 self.peer_up_handler,
                 self.peer_down_handler,
                 self.route_handler,
                 self.error_handler
             )
+            for peer in router["peers"]:
+                beeper.add_neighbor(
+                    "passive",
+                    peer["peer_ip"],
+                    peer["peer_as"],
+                )
             self.beepers.append(beeper)
             self.greenlets.append(spawn(beeper.run))
         joinall(self.greenlets)

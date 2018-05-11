@@ -10,7 +10,7 @@ class StateMachine:
     DEFAULT_HOLD_TIME = 240
     DEFAULT_KEEPALIVE_TIME = DEFAULT_HOLD_TIME // 3
 
-    def __init__(self, local_as, peer_as, router_id, local_address, neighbor, hold_time):
+    def __init__(self, local_as, peer_as, router_id, local_address, neighbor, hold_time=DEFAULT_HOLD_TIME):
         self.local_as = local_as
         self.peer_as = peer_as
         self.router_id = IPAddress.from_string(router_id)
