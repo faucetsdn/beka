@@ -2,7 +2,7 @@ import sys
 import yaml
 import signal
 
-from gevent import spawn, joinall
+from eventlet import GreenPool
 
 from beeper.beeper import Beeper
 
@@ -18,6 +18,7 @@ class Server(object):
 
     def run(self):
         signal.signal(signal.SIGINT, self.signal_handler)
+        pool = GreenPool()
 
         with open("beeper.yaml") as file:
             config = yaml.load(file.read())
@@ -40,13 +41,13 @@ class Server(object):
                     peer["peer_as"],
                 )
             self.beepers.append(beeper)
-            self.greenlets.append(spawn(beeper.run))
-        joinall(self.greenlets)
+            pool.spawn_n(beeper.run)
+        pool.waitall()
         printmsg("All greenlets gone, exiting")
 
     def signal_handler(self, _signal, _frame):
         printmsg("[SIGINT] Shutting down")
-        spawn(self.shutdown)
+        self.shutdown()
 
     def shutdown(self):
         for beeper in self.beepers:

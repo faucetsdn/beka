@@ -1,5 +1,4 @@
-from gevent.pool import Pool
-from gevent.server import StreamServer
+from .stream_server import StreamServer
 
 from .state_machine import StateMachine
 from .peering import Peering
@@ -39,8 +38,7 @@ class Beeper(object):
         }
 
     def run(self):
-        pool = Pool(100)
-        self.stream_server = StreamServer((self.local_address, self.bgp_port), self.handle, spawn=pool)
+        self.stream_server = StreamServer((self.local_address, self.bgp_port), self.handle)
         self.stream_server.serve_forever()
 
     def handle(self, socket, address):

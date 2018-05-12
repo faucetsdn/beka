@@ -1,5 +1,6 @@
-from gevent import spawn, sleep, joinall, killall
-from gevent.queue import Queue
+from eventlet import sleep, GreenPool
+from eventlet.queue import Queue
+import eventlet.greenthread as greenthread
 
 from .chopper import Chopper
 from .event import EventTimerExpired, EventMessageReceived
@@ -20,14 +21,15 @@ class Peering(object):
     def run(self):
         self.input_stream = self.socket.makefile(mode="rb")
         self.chopper = Chopper(self.input_stream)
-        self.greenlets = []
+        self.pool = GreenPool()
+        self.eventlets = []
 
-        self.greenlets.append(spawn(self.send_messages))
-        self.greenlets.append(spawn(self.print_route_updates))
-        self.greenlets.append(spawn(self.kick_timers))
-        self.greenlets.append(spawn(self.receive_messages))
+        self.eventlets.append(self.pool.spawn(self.send_messages))
+        self.eventlets.append(self.pool.spawn(self.print_route_updates))
+        self.eventlets.append(self.pool.spawn(self.kick_timers))
+        self.eventlets.append(self.pool.spawn(self.receive_messages))
 
-        joinall(self.greenlets)
+        self.pool.waitall()
 
     def receive_messages(self):
         while True:
@@ -61,4 +63,5 @@ class Peering(object):
             self.state_machine.event(EventTimerExpired(), tick)
 
     def shutdown(self):
-        killall(self.greenlets)
+        for eventlet in self.eventlets:
+            eventlet.kill()

@@ -1,4 +1,4 @@
-from gevent.queue import Queue
+from eventlet.queue import Queue
 
 from .event import Event
 from .bgp_message import BgpMessage, BgpOpenMessage
