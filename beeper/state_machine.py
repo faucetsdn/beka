@@ -5,6 +5,8 @@ from .bgp_message import BgpMessage, BgpOpenMessage
 from .bgp_message import BgpKeepaliveMessage, BgpNotificationMessage
 from .route import RouteAddition, RouteRemoval
 from .ip import IPAddress
+from .ip4 import IP4Address
+from .ip6 import IP6Address
 
 class StateMachine:
     DEFAULT_HOLD_TIME = 240
@@ -72,7 +74,14 @@ class StateMachine:
     def handle_message_active_state(self, message, tick):
         if message.type == BgpMessage.OPEN_MESSAGE:
             # TODO sanity check incoming open message
-            open_message = BgpOpenMessage(4, self.local_as, self.hold_time, self.router_id)
+            # TODO advertise capabilities properly
+            ipv4_capabilities = b"\x01\x04\x00\x01\x00\x01"
+            ipv6_capabilities = b"\x01\x04\x00\x02\x00\x01"
+            if isinstance(self.local_address, IP4Address):
+                capabilities = ipv4_capabilities
+            elif isinstance(self.local_address, IP6Address):
+                capabilities = ipv6_capabilities
+            open_message = BgpOpenMessage(4, self.local_as, self.hold_time, self.router_id, capabilities)
             keepalive_message = BgpKeepaliveMessage()
             self.output_messages.put(open_message)
             self.output_messages.put(keepalive_message)

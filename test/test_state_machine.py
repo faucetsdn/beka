@@ -8,6 +8,11 @@ from beeper.route import RouteAddition, RouteRemoval
 import time
 import unittest
 import socket
+import struct
+
+def build_byte_string(hex_stream):
+    values = [int(x, 16) for x in map(''.join, zip(*[iter(hex_stream)]*2))]
+    return struct.pack("!" + "B" * len(values), *values)
 
 class StateMachinePassiveActiveTestCase(unittest.TestCase):
     def setUp(self):
@@ -32,7 +37,7 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
         self.assertEqual(self.beeper.route_updates.qsize(), 0)
 
     def test_open_message_advances_to_open_confirm_and_sets_timers(self):
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "open_confirm")
         self.assertEqual(self.beeper.output_messages.qsize(), 2)
@@ -65,7 +70,7 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
         self.beeper = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "open_confirm")
         for _ in range(self.beeper.output_messages.qsize()):
@@ -113,7 +118,7 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.beeper.timers["hold"], self.tick)
 
     def test_open_message_advances_to_idle_and_sends_notification(self):
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
         self.assertEqual(self.beeper.output_messages.qsize(), 1)
@@ -139,7 +144,7 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
         self.beeper = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         for _ in range(self.beeper.output_messages.qsize()):
             self.beeper.output_messages.get()
@@ -233,7 +238,7 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
         self.assertEqual(self.beeper.state, "idle")
 
     def test_open_message_advances_to_idle_and_sends_notification(self):
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
         self.beeper.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.beeper.state, "idle")
         self.assertEqual(self.beeper.output_messages.qsize(), 1)

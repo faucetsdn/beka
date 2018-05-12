@@ -11,16 +11,17 @@ def build_byte_string(hex_stream):
 
 class BgpMessageTestCase(unittest.TestCase):
     def test_open_message_parses(self):
-        serialised_message = build_byte_string("04fe0900b4c0a8000f00")
+        serialised_message = build_byte_string("04fe0900b4c0a8000f080206010400020001")
         message = parse_bgp_message(BgpMessage.OPEN_MESSAGE, serialised_message)
         self.assertEqual(message.version, 4)
         self.assertEqual(message.peer_as, 65033)
         self.assertEqual(message.hold_time, 180)
         self.assertEqual(message.identifier, IP4Address.from_string("192.168.0.15"))
+        self.assertEqual(message.capabilities, build_byte_string("010400020001"))
 
     def test_open_message_packs(self):
-        expected_serialised_message = build_byte_string("04fe0900b4c0a8000f00")
-        message = BgpOpenMessage(4, 65033, 180, IP4Address.from_string("192.168.0.15"))
+        expected_serialised_message = build_byte_string("04fe0900b4c0a8000f080206010400020001")
+        message = BgpOpenMessage(4, 65033, 180, IP4Address.from_string("192.168.0.15"), build_byte_string("010400020001"))
         serialised_message = message.pack()
         self.assertEqual(serialised_message, expected_serialised_message)
 

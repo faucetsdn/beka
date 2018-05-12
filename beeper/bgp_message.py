@@ -25,32 +25,47 @@ class BgpMessage(object):
             )
         return header + packed_message
 
+OPTIONAL_PARAMETER_CAPABILITY = 2
+
+def parse_optional_parameters(serialised_optional_parameters):
+    stream = BytesIO(serialised_optional_parameters)
+    parameter_type, parameter_length = struct.unpack("!BB", stream.read(2))
+    if parameter_type != OPTIONAL_PARAMETER_CAPABILITY:
+        raise ValueError("OPEN: Got unsupported optional parameter: %d" % parameter_type)
+    return stream.read()
+
 class BgpOpenMessage(BgpMessage):
-    def __init__(self, version, peer_as, hold_time, identifier):
+    def __init__(self, version, peer_as, hold_time, identifier, capabilities):
         self.version = version
         self.peer_as = peer_as
         self.hold_time = hold_time
         self.identifier = identifier
         self.type = self.OPEN_MESSAGE
+        self.capabilities = capabilities
 
     @classmethod
     def parse(cls, serialised_message):
-        # we ignore optional parameters
         version, peer_as, hold_time, identifier, _optional_parameters_length = struct.unpack(
             "!BHH4sB",
             serialised_message[:10]
         )
-        return cls(version, peer_as, hold_time, IP4Address(identifier))
+        capabilities = parse_optional_parameters(serialised_message[10:10+_optional_parameters_length])
+        return cls(version, peer_as, hold_time, IP4Address(identifier), capabilities)
 
     def pack(self):
+        capabilities_header = struct.pack(
+            "!BB",
+            OPTIONAL_PARAMETER_CAPABILITY,
+            len(self.capabilities))
+
         return struct.pack(
             "!BHH4sB",
             self.version,
             self.peer_as,
             self.hold_time,
             self.identifier.address,
-            0
-        )
+            len(capabilities_header + self.capabilities)
+        ) + capabilities_header + self.capabilities
 
     def __str__(self):
         return "BgpOpenMessage: Version %s, Peer AS: %s, Hold time: %s, Identifier: %s" % (
