@@ -17,6 +17,10 @@ class Peering(object):
         self.peer_port = peer_address[1]
         self.socket = socket
         self.route_handler = route_handler
+        self.start_time = int(time.time())
+
+    def uptime(self):
+        return int(time.time()) - self.start_time
 
     def run(self):
         self.input_stream = self.socket.makefile(mode="rb")

@@ -18,6 +18,7 @@ class RouteAddition:
 class RouteRemoval:
     def __init__(self, prefix):
         self.prefix = prefix
+        self.next_hop = None
         self.is_withdraw = True
 
     def __str__(self):

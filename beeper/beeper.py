@@ -37,6 +37,20 @@ class Beeper(object):
             "peer_as": peer_as
         }
 
+    def neighbor_states(self):
+        states = []
+        for peering in self.peerings:
+            states.append((
+                peering.peer_address,
+                {
+                    'info': {
+                        'uptime': peering.uptime()
+                    }
+                }
+            ))
+
+        return states
+
     def run(self):
         self.stream_server = StreamServer((self.local_address, self.bgp_port), self.handle)
         self.stream_server.serve_forever()
