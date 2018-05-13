@@ -72,7 +72,8 @@ class Beeper(object):
     def handle(self, socket, address):
         peer_ip = address[0]
         if peer_ip not in self.peers:
-            self.error_handler("Rejecting connection from %s:%d" % address)
+            if self.error_handler:
+                self.error_handler("Rejecting connection from %s:%d" % address)
             socket.close()
             return
         peer = self.peers[peer_ip]
