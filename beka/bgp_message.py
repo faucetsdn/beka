@@ -1,8 +1,8 @@
 import struct
 import socket
 from .packing_tools import bytes_to_short, bytes_to_integer
-from .ip4 import IP4Prefix, IP4Address
-from .ip6 import IP6Prefix, IP6Address
+from .ip import IP4Prefix, IP4Address
+from .ip import IP6Prefix, IP6Address
 from io import BytesIO
 
 class BgpMessage(object):

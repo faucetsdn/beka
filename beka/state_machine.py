@@ -5,8 +5,8 @@ from .bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage
 from .bgp_message import BgpKeepaliveMessage, BgpNotificationMessage
 from .route import RouteAddition, RouteRemoval
 from .ip import IPAddress, IPPrefix
-from .ip4 import IP4Address, IP4Prefix
-from .ip6 import IP6Address, IP6Prefix
+from .ip import IP4Address, IP4Prefix
+from .ip import IP6Address, IP6Prefix
 
 class StateMachine:
     DEFAULT_HOLD_TIME = 240

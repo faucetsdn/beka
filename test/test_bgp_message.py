@@ -1,7 +1,7 @@
 from beka.bgp_message import BgpMessage, parse_bgp_message, BgpOpenMessage
 from beka.bgp_message import BgpUpdateMessage, BgpNotificationMessage, BgpKeepaliveMessage
-from beka.ip4 import IP4Prefix, IP4Address
-from beka.ip6 import IP6Prefix, IP6Address
+from beka.ip import IP4Prefix, IP4Address
+from beka.ip import IP6Prefix, IP6Address
 import socket
 import struct
 import unittest
