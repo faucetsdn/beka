@@ -1,4 +1,5 @@
-from beeper.bgp_message import BgpMessage, parse_bgp_message, BgpOpenMessage, BgpNotificationMessage, BgpKeepaliveMessage
+from beeper.bgp_message import BgpMessage, parse_bgp_message, BgpOpenMessage
+from beeper.bgp_message import BgpUpdateMessage, BgpNotificationMessage, BgpKeepaliveMessage
 from beeper.ip4 import IP4Prefix, IP4Address
 from beeper.ip6 import IP6Prefix, IP6Address
 import socket
@@ -49,11 +50,26 @@ class BgpMessageTestCase(unittest.TestCase):
         self.assertEqual(serialised_message, expected_serialised_message)
 
     def test_update_message_new_routes_parses(self):
-        serialised_message = build_byte_string("0000002740010101400200400304c0a800218004040000000040050400000064c00808fe0901f4fe090258080a")
+        serialised_message = build_byte_string("0000000e40010101400200400304c0a80021080a")
         message = parse_bgp_message(BgpMessage.UPDATE_MESSAGE, serialised_message)
         self.assertEqual(message.nlri[0], IP4Prefix.from_string("10.0.0.0/8"))
         self.assertEqual(message.path_attributes["next_hop"], IP4Address.from_string("192.168.0.33"))
         self.assertEqual(message.path_attributes["origin"], "EGP")
+        self.assertEqual(message.path_attributes["as_path"], "")
+
+    def test_update_message_new_routes_packs(self):
+        expected_serialised_message = build_byte_string("0000000e40010101400200400304c0a80021080a17c0a840")
+        nlri = [
+            IP4Prefix.from_string("10.0.0.0/8"),
+            IP4Prefix.from_string("192.168.64.0/23")
+        ]
+        path_attributes = {
+            "next_hop": IP4Address.from_string("192.168.0.33"),
+            "origin": "EGP",
+            "as_path": ""
+        }
+        message = BgpUpdateMessage([], path_attributes, nlri)
+        self.assertEquals(message.pack(), expected_serialised_message)
 
     def test_update_message_withdrawn_routes_parses(self):
         serialised_message = build_byte_string("0004180a01010000")
@@ -81,4 +97,13 @@ class BgpMessageTestCase(unittest.TestCase):
         ]
 
         self.assertEqual(message.path_attributes["mp_unreach_nlri"]["withdrawn_routes"], expected_withdrawn_routes)
+
+    # def test_update_v6_message_new_routes_packs(self):
+    #     expected_serialised_message = build_byte_string("0000004b400101004002040201fdeb800e3d0002012020010db80001000000000242ac110002fe800000000000000042acfffe110002007f20010db40000000000000000000000002f20010db30000")
+    #     message = parse_bgp_message(BgpMessage.UPDATE_MESSAGE, serialised_message)
+    #     origin = "IGP"
+    #     self.assertEqual(message.path_attributes["mp_reach_nlri"]["next_hop"]["afi"], IP6Address.from_string("2001:db8:1::242:ac11:2"))
+    #     self.assertEqual(message.path_attributes["mp_reach_nlri"]["next_hop"]["safi"], IP6Address.from_string("fe80::42:acff:fe11:2"))
+    #     self.assertEqual(message.path_attributes["mp_reach_nlri"]["nlri"][0], IP6Prefix.from_string("2001:db4::/127"))
+    #     self.assertEqual(message.path_attributes["mp_reach_nlri"]["nlri"][1], IP6Prefix.from_string("2001:db3::/47"))
 

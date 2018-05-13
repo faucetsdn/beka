@@ -1,7 +1,7 @@
 from eventlet.queue import Queue
 
 from .event import Event
-from .bgp_message import BgpMessage, BgpOpenMessage
+from .bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage
 from .bgp_message import BgpKeepaliveMessage, BgpNotificationMessage
 from .route import RouteAddition, RouteRemoval
 from .ip import IPAddress
@@ -22,6 +22,7 @@ class StateMachine:
         self.keepalive_time = hold_time // 3
         self.output_messages = Queue()
         self.route_updates = Queue()
+        self.routes_to_advertise = []
 
         self.timers = {
             "hold": None,
@@ -93,6 +94,8 @@ class StateMachine:
 
     def handle_message_open_confirm_state(self, message, tick):
         if message.type == BgpMessage.KEEPALIVE_MESSAGE:
+            for message in self.build_update_messages():
+                self.output_messages.put(message)
             self.timers["hold"] = tick
             self.state = "established"
         elif message.type == BgpMessage.NOTIFICATION_MESSAGE:
@@ -150,3 +153,28 @@ class StateMachine:
                     withdrawal
                 )
                 self.route_updates.put(route)
+
+    def build_update_messages(self):
+        update_messages = []
+
+        # TODO handle withdrawals
+        route_additions = filter(lambda x: isinstance(x, RouteAddition), self.routes_to_advertise)
+        nlri_by_path = {}
+        for route_addition in route_additions:
+            # TODO we're assuming IPv4 here
+            path_attributes = {
+                "next_hop": route_addition.next_hop,
+                "as_path": route_addition.as_path,
+                "origin": route_addition.origin
+            }
+            path_key = tuple(path_attributes.items())
+
+            if path_key not in nlri_by_path:
+                nlri_by_path[path_key] = []
+
+            nlri_by_path[path_key].append(route_addition.prefix)
+
+        for path_attributes, nlri in nlri_by_path.items():
+            update_messages.append(BgpUpdateMessage([], dict(path_attributes), nlri))
+
+        return update_messages

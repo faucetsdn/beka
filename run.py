@@ -40,6 +40,12 @@ class Server(object):
                     peer["peer_ip"],
                     peer["peer_as"],
                 )
+            if "routes" in router:
+                for route in router["routes"]:
+                    beeper.add_route(
+                        route["prefix"],
+                        route["next_hop"]
+                    )
             self.beepers.append(beeper)
             pool.spawn_n(beeper.run)
         pool.waitall()

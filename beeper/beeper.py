@@ -1,7 +1,11 @@
+from copy import copy
+
 from .stream_server import StreamServer
 
 from .state_machine import StateMachine
 from .peering import Peering
+from .route import RouteAddition, RouteRemoval
+from .ip import IPAddress, IPPrefix
 
 DEFAULT_BGP_PORT = 179
 
@@ -21,12 +25,12 @@ class Beeper(object):
         self.peers = {}
         self.peerings = []
         self.stream_server = None
+        self.routes_to_advertise = []
 
         if not self.bgp_port:
             self.bgp_port = DEFAULT_BGP_PORT
 
-    def add_neighbor(self, connect_mode, peer_ip,
-            peer_as):
+    def add_neighbor(self, connect_mode, peer_ip, peer_as):
         if connect_mode != "passive":
             raise ValueError("Only passive BGP supported")
         if peer_ip in self.peers:
@@ -36,6 +40,16 @@ class Beeper(object):
             "peer_ip": peer_ip,
             "peer_as": peer_as
         }
+
+    def add_route(self, prefix, next_hop):
+        self.routes_to_advertise.append(
+            RouteAddition(
+                prefix=IPPrefix.from_string(prefix),
+                next_hop=IPAddress.from_string(next_hop),
+                as_path="",
+                origin="IGP"
+            )
+        )
 
     def neighbor_states(self):
         states = []
@@ -69,6 +83,7 @@ class Beeper(object):
             local_address=self.local_address,
             neighbor=peer["peer_ip"]
         )
+        state_machine.routes_to_advertise = copy(self.routes_to_advertise)
         peering = Peering(state_machine, address, socket, self.route_handler)
         self.peerings.append(peering)
         self.peer_up_handler(peer_ip, peer["peer_as"])

@@ -6,6 +6,9 @@ routers:
     peers:
       - peer_ip: 172.25.0.111
         peer_as: 65003
+    routes:
+      - prefix: "10.1.234.0/24"
+        next_hop: 172.25.0.1
   - router_id: 172.25.0.1
     local_as: 65002
     local_address: "2001:db9:1::1"

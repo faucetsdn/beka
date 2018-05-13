@@ -219,6 +219,44 @@ attribute_keys = {
     15: "mp_unreach_nlri",
 }
 
+ORIGIN_NUMBERS = {
+    "IGP": 0,
+    "EGP": 1,
+    "INCOMPLETE": 2
+}
+
+def pack_origin(origin):
+    return struct.pack("!B", ORIGIN_NUMBERS[origin])
+
+def pack_as_path(as_path):
+    # TODO actually do this
+    return b""
+
+def pack_next_hop(next_hop):
+    return next_hop.address
+
+attribute_packers = {
+    "origin": pack_origin,
+    "as_path": pack_as_path,
+    "next_hop": pack_next_hop
+}
+
+attribute_numbers = {
+    "origin" : 1,
+    "as_path" : 2,
+    "next_hop" : 3,
+    "mp_reach_nlri" : 14,
+    "mp_unreach_nlri" : 15,
+}
+
+attribute_flags = {
+    "origin" : 0x40,
+    "as_path" : 0x40,
+    "next_hop" : 0x40,
+    #"mp_reach_nlri" : 14,
+    #"mp_unreach_nlri" : 15,
+}
+
 def parse_path_attributes(serialised_path_attributes):
     stream = BytesIO(serialised_path_attributes)
     path_attributes = {}
@@ -278,7 +316,43 @@ class BgpUpdateMessage(BgpMessage):
         return cls(withdrawn_routes, path_attributes, nlri)
 
     def pack(self):
-        return b""
+        # TODO pack withdrawn routes
+        packed_withdrawn_routes = b""
+        packed_withdrawn_routes_length = struct.pack("!H", len(packed_withdrawn_routes))
+        packed_path_attributes = self.pack_path_attributes()
+        packed_path_attributes_length = struct.pack("!H", len(packed_path_attributes))
+        packed_nlri = self.pack_nlri()
+        return packed_withdrawn_routes_length + \
+            packed_withdrawn_routes + \
+            packed_path_attributes_length + \
+            packed_path_attributes + \
+            packed_nlri
+
+    def pack_path_attributes(self):
+        packed_path_attributes = []
+        sorted_attribute_pairs = sorted(self.path_attributes.items(), key=lambda x: attribute_numbers[x[0]])
+        for name, path_attribute in sorted_attribute_pairs:
+            packed_entry = attribute_packers[name](path_attribute)
+            packed_header = struct.pack(
+                "!BBB",
+                attribute_flags[name],
+                attribute_numbers[name],
+                len(packed_entry)
+            )
+            packed_path_attribute = packed_header + packed_entry
+            packed_path_attributes.append(packed_path_attribute)
+
+        return b"".join(packed_path_attributes)
+
+    def pack_nlri(self):
+        packed_nlri = []
+
+        for prefix in self.nlri:
+            # TODO this feels like it should be on IP4Prefix
+            packed_prefix = struct.pack("!B", prefix.length) + pack_prefix(prefix.prefix, prefix.length)
+            packed_nlri.append(packed_prefix)
+
+        return b"".join(packed_nlri)
 
     def __str__(self):
         return "BgpUpdateMessage: Widthdrawn routes: %s, Path attributes: %s, NLRI: %s" % (
