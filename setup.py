@@ -16,7 +16,7 @@ setup(
     name='beka',
     description='A bare-bones BGP speaker',
     long_description=long_description,
-    version='0.1.0',
+    version='0.2.1',
     url='https://github.com/samrussell/beka',
     author='Sam Russell',
     author_email='sam.h.russell@gmail.com',
