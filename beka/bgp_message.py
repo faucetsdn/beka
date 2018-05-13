@@ -259,11 +259,27 @@ def pack_mp_reach_nlri(mp_reach_nlri):
 
     return packed_header + packed_next_hops + packed_reserved + packed_nlri
 
+def pack_mp_unreach_nlri(mp_unreach_nlri):
+    packed_header = struct.pack(
+        "!HB",
+        IP6_AFI,
+        UNICAST_SAFI
+    )
+    packed_withdrawn_route_list = []
+    for withdrawn_route in mp_unreach_nlri["withdrawn_routes"]:
+        packed_prefix = struct.pack("!B", withdrawn_route.length) + \
+            pack_prefix(withdrawn_route.prefix, withdrawn_route.length)
+        packed_withdrawn_route_list.append(packed_prefix)
+    packed_withdrawn_routes = b"".join(packed_withdrawn_route_list)
+
+    return packed_header + packed_withdrawn_routes
+
 attribute_packers = {
     "origin": pack_origin,
     "as_path": pack_as_path,
     "next_hop": pack_next_hop,
-    "mp_reach_nlri" : pack_mp_reach_nlri
+    "mp_reach_nlri" : pack_mp_reach_nlri,
+    "mp_unreach_nlri" : pack_mp_unreach_nlri
 }
 
 attribute_numbers = {
@@ -279,7 +295,7 @@ attribute_flags = {
     "as_path" : 0x40,
     "next_hop" : 0x40,
     "mp_reach_nlri" : 0x80,
-    #"mp_unreach_nlri" : 0x40,
+    "mp_unreach_nlri" : 0x80,
 }
 
 def parse_path_attributes(serialised_path_attributes):
@@ -302,7 +318,7 @@ def parse_path_attributes(serialised_path_attributes):
 
     return path_attributes
 
-def parse_widthdrawn_routes(serialised_withdrawn_routes):
+def parse_withdrawn_routes(serialised_withdrawn_routes):
     stream = BytesIO(serialised_withdrawn_routes)
     prefixes = []
 
@@ -329,7 +345,7 @@ class BgpUpdateMessage(BgpMessage):
         data_stream = BytesIO(serialised_message)
         withdrawn_routes_length = bytes_to_short(data_stream.read(2))
         serialised_withdrawn_routes = data_stream.read(withdrawn_routes_length)
-        withdrawn_routes = parse_widthdrawn_routes(serialised_withdrawn_routes)
+        withdrawn_routes = parse_withdrawn_routes(serialised_withdrawn_routes)
 
         total_path_attribute_length = bytes_to_short(data_stream.read(2))
         serialised_path_attributes = data_stream.read(total_path_attribute_length)
@@ -342,7 +358,7 @@ class BgpUpdateMessage(BgpMessage):
 
     def pack(self):
         # TODO pack withdrawn routes
-        packed_withdrawn_routes = b""
+        packed_withdrawn_routes = self.pack_withdrawn_routes()
         packed_withdrawn_routes_length = struct.pack("!H", len(packed_withdrawn_routes))
         packed_path_attributes = self.pack_path_attributes()
         packed_path_attributes_length = struct.pack("!H", len(packed_path_attributes))
@@ -352,6 +368,15 @@ class BgpUpdateMessage(BgpMessage):
             packed_path_attributes_length + \
             packed_path_attributes + \
             packed_nlri
+
+    def pack_withdrawn_routes(self):
+        packed_routes_list = []
+
+        for prefix in self.withdrawn_routes:
+            packed_route = struct.pack("!B", prefix.length) + pack_prefix(prefix.prefix, prefix.length)
+            packed_routes_list.append(packed_route)
+
+        return b"".join(packed_routes_list)
 
     def pack_path_attributes(self):
         packed_path_attributes = []
@@ -380,7 +405,7 @@ class BgpUpdateMessage(BgpMessage):
         return b"".join(packed_nlri)
 
     def __str__(self):
-        return "BgpUpdateMessage: Widthdrawn routes: %s, Path attributes: %s, NLRI: %s" % (
+        return "BgpUpdateMessage: Withdrawn routes: %s, Path attributes: %s, NLRI: %s" % (
             [str(x) for x in self.withdrawn_routes],
             self.path_attributes,
             [str(x) for x in self.nlri]
