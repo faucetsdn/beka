@@ -1,7 +1,7 @@
-from beeper.bgp_message import BgpMessage, parse_bgp_message, BgpOpenMessage
-from beeper.bgp_message import BgpUpdateMessage, BgpNotificationMessage, BgpKeepaliveMessage
-from beeper.ip4 import IP4Prefix, IP4Address
-from beeper.ip6 import IP6Prefix, IP6Address
+from beka.bgp_message import BgpMessage, parse_bgp_message, BgpOpenMessage
+from beka.bgp_message import BgpUpdateMessage, BgpNotificationMessage, BgpKeepaliveMessage
+from beka.ip4 import IP4Prefix, IP4Address
+from beka.ip6 import IP6Prefix, IP6Address
 import socket
 import struct
 import unittest

@@ -9,7 +9,7 @@ from .ip import IPAddress, IPPrefix
 
 DEFAULT_BGP_PORT = 179
 
-class Beeper(object):
+class Beka(object):
     def __init__(self, local_address, bgp_port, local_as,
             router_id, peer_up_handler, peer_down_handler,
             route_handler, error_handler):

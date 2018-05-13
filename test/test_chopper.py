@@ -1,4 +1,4 @@
-from beeper import chopper
+from beka import chopper
 import struct
 import unittest
 from io import BytesIO

@@ -1,9 +1,9 @@
-from beeper.bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage, BgpKeepaliveMessage, BgpNotificationMessage
-from beeper.state_machine import StateMachine
-from beeper.event import Event, EventTimerExpired, EventMessageReceived, EventShutdown
-from beeper.ip4 import IP4Prefix, IP4Address
-from beeper.ip6 import IP6Prefix, IP6Address
-from beeper.route import RouteAddition, RouteRemoval
+from beka.bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage, BgpKeepaliveMessage, BgpNotificationMessage
+from beka.state_machine import StateMachine
+from beka.event import Event, EventTimerExpired, EventMessageReceived, EventShutdown
+from beka.ip4 import IP4Prefix, IP4Address
+from beka.ip6 import IP6Prefix, IP6Address
+from beka.route import RouteAddition, RouteRemoval
 
 import time
 import unittest
