@@ -4,9 +4,9 @@ from .event import Event
 from .bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage
 from .bgp_message import BgpKeepaliveMessage, BgpNotificationMessage
 from .route import RouteAddition, RouteRemoval
-from .ip import IPAddress
-from .ip4 import IP4Address
-from .ip6 import IP6Address
+from .ip import IPAddress, IPPrefix
+from .ip4 import IP4Address, IP4Prefix
+from .ip6 import IP6Address, IP6Prefix
 
 class StateMachine:
     DEFAULT_HOLD_TIME = 240
@@ -137,7 +137,7 @@ class StateMachine:
             for prefix in update_message.path_attributes["mp_reach_nlri"]["nlri"]:
                 route = RouteAddition(
                     prefix,
-                    update_message.path_attributes["mp_reach_nlri"]["next_hop"]["afi"],
+                    update_message.path_attributes["mp_reach_nlri"]["next_hop"][0],
                     update_message.path_attributes["as_path"],
                     update_message.path_attributes["origin"]
                 )
@@ -155,13 +155,18 @@ class StateMachine:
                 self.route_updates.put(route)
 
     def build_update_messages(self):
-        update_messages = []
-
         # TODO handle withdrawals
-        route_additions = filter(lambda x: isinstance(x, RouteAddition), self.routes_to_advertise)
+        route_additions = list(filter(lambda x: isinstance(x, RouteAddition), self.routes_to_advertise))
+        ipv4_route_additions = filter(lambda x: isinstance(x.prefix, IP4Prefix), route_additions)
+        ipv6_route_additions = filter(lambda x: isinstance(x.prefix, IP6Prefix), route_additions)
+
+        return self.build_ipv4_update_messages(ipv4_route_additions) + \
+            self.build_ipv6_update_messages(ipv6_route_additions)
+
+    def build_ipv4_update_messages(self, ipv4_route_additions):
+        update_messages = []
         nlri_by_path = {}
-        for route_addition in route_additions:
-            # TODO we're assuming IPv4 here
+        for route_addition in ipv4_route_additions:
             path_attributes = {
                 "next_hop": route_addition.next_hop,
                 "as_path": route_addition.as_path,
@@ -176,5 +181,37 @@ class StateMachine:
 
         for path_attributes, nlri in nlri_by_path.items():
             update_messages.append(BgpUpdateMessage([], dict(path_attributes), nlri))
+
+        return update_messages
+
+    def build_ipv6_update_messages(self, ipv6_route_additions):
+        update_messages = []
+        nlri_by_path = {}
+        for route_addition in ipv6_route_additions:
+            path_attributes = {
+                "next_hop": route_addition.next_hop,
+                "as_path": route_addition.as_path,
+                "origin": route_addition.origin
+            }
+            path_key = tuple(path_attributes.items())
+
+            if path_key not in nlri_by_path:
+                nlri_by_path[path_key] = []
+
+            nlri_by_path[path_key].append(route_addition.prefix)
+
+        for path_attributes, nlri in nlri_by_path.items():
+            path_attributes_dict = dict(path_attributes)
+            path_attributes_v6 = {
+                "as_path": path_attributes_dict["as_path"],
+                "origin": path_attributes_dict["origin"],
+                "mp_reach_nlri": {
+                    "next_hop": [
+                        path_attributes_dict["next_hop"],
+                    ],
+                    "nlri": nlri
+                }
+            }
+            update_messages.append(BgpUpdateMessage([], path_attributes_v6, []))
 
         return update_messages

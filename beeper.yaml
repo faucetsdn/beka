@@ -16,3 +16,6 @@ routers:
     peers:
       - peer_ip: "2001:db9:1::99"
         peer_as: 65003
+    routes:
+      - prefix: "2001:dbd:1::/124"
+        next_hop: "2001:db9:1::1"

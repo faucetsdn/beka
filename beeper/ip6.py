@@ -22,6 +22,9 @@ class IP6Address:
     def __eq__(self, other):
         return self.address == other.address
 
+    def __hash__(self):
+        return hash(self.address)
+
 class IP6Prefix:
     def __init__(self, prefix, length):
         self.prefix = prefix

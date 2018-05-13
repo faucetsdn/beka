@@ -143,7 +143,6 @@ def parse_next_hop(packed_next_hop):
 
 IP6_AFI = 2
 UNICAST_SAFI = 1
-IP6_UNICAST_LENGTH = 32
 
 IP6_LENGTH = 16
 
@@ -177,12 +176,12 @@ def parse_mp_reach_nlri(packed_mp_reach_nlri):
         raise ValueError("MP_REACH_NLRI: Got unsupported AFI: %d" % afi)
     if safi != UNICAST_SAFI:
         raise ValueError("MP_REACH_NLRI: Got unsupported SAFI: %d" % safi)
-    if next_hop_length != IP6_UNICAST_LENGTH:
+    if next_hop_length % IP6_LENGTH != 0:
         raise ValueError("MP_REACH_NLRI: Got unsupported next hop length: %d" % next_hop_length)
 
-    attributes["next_hop"] = {}
-    attributes["next_hop"]["afi"] = IP6Address(struct.unpack("!16s", stream.read(IP6_LENGTH))[0])
-    attributes["next_hop"]["safi"] = IP6Address(struct.unpack("!16s", stream.read(IP6_LENGTH))[0])
+    attributes["next_hop"] = []
+    for _ in range(next_hop_length // 16):
+        attributes["next_hop"].append(IP6Address(struct.unpack("!16s", stream.read(IP6_LENGTH))[0]))
 
     _reserved_snpa = stream.read(1)
 
@@ -245,18 +244,20 @@ def pack_nlri6(nlri):
     return b"".join(packed_nlri)
 
 def pack_mp_reach_nlri(mp_reach_nlri):
-    packed_path = struct.pack(
-        "!HBB16s16sB",
+    packed_header = struct.pack(
+        "!HBB",
         IP6_AFI,
         UNICAST_SAFI,
-        IP6_UNICAST_LENGTH,
-        mp_reach_nlri["next_hop"]["afi"].address,
-        mp_reach_nlri["next_hop"]["safi"].address,
-        0
+        IP6_LENGTH * len(mp_reach_nlri["next_hop"])
     )
+    packed_next_hop_list = []
+    for next_hop in mp_reach_nlri["next_hop"]:
+        packed_next_hop_list.append(struct.pack("!16s", next_hop.address))
+    packed_next_hops = b"".join(packed_next_hop_list)
+    packed_reserved = struct.pack("!B", 0)
     packed_nlri = pack_nlri6(mp_reach_nlri["nlri"])
 
-    return packed_path + packed_nlri
+    return packed_header + packed_next_hops + packed_reserved + packed_nlri
 
 attribute_packers = {
     "origin": pack_origin,

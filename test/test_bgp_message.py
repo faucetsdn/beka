@@ -80,8 +80,8 @@ class BgpMessageTestCase(unittest.TestCase):
         serialised_message = build_byte_string("0000004b400101004002040201fdeb800e3d0002012020010db80001000000000242ac110002fe800000000000000042acfffe110002007f20010db40000000000000000000000002f20010db30000")
         message = parse_bgp_message(BgpMessage.UPDATE_MESSAGE, serialised_message)
         self.assertEqual(message.path_attributes["origin"], "IGP")
-        self.assertEqual(message.path_attributes["mp_reach_nlri"]["next_hop"]["afi"], IP6Address.from_string("2001:db8:1::242:ac11:2"))
-        self.assertEqual(message.path_attributes["mp_reach_nlri"]["next_hop"]["safi"], IP6Address.from_string("fe80::42:acff:fe11:2"))
+        self.assertEqual(message.path_attributes["mp_reach_nlri"]["next_hop"][0], IP6Address.from_string("2001:db8:1::242:ac11:2"))
+        self.assertEqual(message.path_attributes["mp_reach_nlri"]["next_hop"][1], IP6Address.from_string("fe80::42:acff:fe11:2"))
         self.assertEqual(message.path_attributes["mp_reach_nlri"]["nlri"][0], IP6Prefix.from_string("2001:db4::/127"))
         self.assertEqual(message.path_attributes["mp_reach_nlri"]["nlri"][1], IP6Prefix.from_string("2001:db3::/47"))
 
@@ -104,10 +104,10 @@ class BgpMessageTestCase(unittest.TestCase):
             "origin": "IGP",
             "as_path": "",
             "mp_reach_nlri": {
-                "next_hop": {
-                    "afi": IP6Address.from_string("2001:db8:1::242:ac11:2"),
-                    "safi": IP6Address.from_string("fe80::42:acff:fe11:2")
-                },
+                "next_hop": [
+                    IP6Address.from_string("2001:db8:1::242:ac11:2"),
+                    IP6Address.from_string("fe80::42:acff:fe11:2")
+                ],
                 "nlri": [
                     IP6Prefix.from_string("2001:db4::/127"),
                     IP6Prefix.from_string("2001:db3::/47")

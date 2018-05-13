@@ -158,47 +158,46 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
             IP4Prefix.from_string("192.168.128.0/23")
         ])
 
-    # TODO IPv6 route advertisements
-    # def test_keepalive_message_sends_all_routes_v6(self):
-    #     self.tick += 3600
-    #     self.state_machine.routes_to_advertise = [
-    #         RouteAddition(
-    #             IP6Prefix.from_string("2001:db4::/127"),
-    #             IP6Address.from_string("192.168.1.33"),
-    #             "",
-    #             "IGP"
-    #         ),
-    #         RouteAddition(
-    #             IP6Prefix.from_string("2001:db5::/127"),
-    #             IP6Address.from_string("192.168.1.33"),
-    #             "",
-    #             "IGP"
-    #         ),
-    #         RouteAddition(
-    #             IP6Prefix.from_string("2001:db6::/127"),
-    #             IP6Address.from_string("192.168.1.34"),
-    #             "",
-    #             "IGP"
-    #         )
-    #     ]
-    #     message = BgpKeepaliveMessage()
-    #     self.state_machine.event(EventMessageReceived(message), self.tick)
-    #     self.assertEqual(self.state_machine.state, "established")
-    #     self.assertEqual(self.state_machine.timers["hold"], self.tick)
-    #     self.assertEqual(self.state_machine.output_messages.qsize(), 2)
-    #     first_update = self.state_machine.output_messages.get()
-    #     second_update = self.state_machine.output_messages.get()
-    #     self.assertEqual(first_update.type, BgpMessage.UPDATE_MESSAGE)
-    #     self.assertEqual(second_update.type, BgpMessage.UPDATE_MESSAGE)
-    #     self.assertEqual(first_update.path_attributes["next_hop"], IP4Address.from_string("192.168.1.33"))
-    #     self.assertEqual(first_update.nlri, [
-    #         IP4Prefix.from_string("10.0.0.0/8"),
-    #         IP4Prefix.from_string("192.168.64.0/23")
-    #     ])
-    #     self.assertEqual(second_update.path_attributes["next_hop"], IP4Address.from_string("192.168.1.34"))
-    #     self.assertEqual(second_update.nlri, [
-    #         IP4Prefix.from_string("192.168.128.0/23")
-    #     ])
+    def test_keepalive_message_sends_all_routes_v6(self):
+        self.tick += 3600
+        self.state_machine.routes_to_advertise = [
+            RouteAddition(
+                IP6Prefix.from_string("2001:db4::/127"),
+                IP6Address.from_string("2001:db1::1"),
+                "",
+                "IGP"
+            ),
+            RouteAddition(
+                IP6Prefix.from_string("2001:db5::/127"),
+                IP6Address.from_string("2001:db1::1"),
+                "",
+                "IGP"
+            ),
+            RouteAddition(
+                IP6Prefix.from_string("2001:db6::/127"),
+                IP6Address.from_string("2001:db1::2"),
+                "",
+                "IGP"
+            )
+        ]
+        message = BgpKeepaliveMessage()
+        self.state_machine.event(EventMessageReceived(message), self.tick)
+        self.assertEqual(self.state_machine.state, "established")
+        self.assertEqual(self.state_machine.timers["hold"], self.tick)
+        self.assertEqual(self.state_machine.output_messages.qsize(), 2)
+        first_update = self.state_machine.output_messages.get()
+        second_update = self.state_machine.output_messages.get()
+        self.assertEqual(first_update.type, BgpMessage.UPDATE_MESSAGE)
+        self.assertEqual(second_update.type, BgpMessage.UPDATE_MESSAGE)
+        self.assertEqual(first_update.path_attributes["mp_reach_nlri"]["next_hop"], [IP6Address.from_string("2001:db1::1")])
+        self.assertEqual(first_update.path_attributes["mp_reach_nlri"]["nlri"], [
+            IP6Prefix.from_string("2001:db4::/127"),
+            IP6Prefix.from_string("2001:db5::/127")
+        ])
+        self.assertEqual(second_update.path_attributes["mp_reach_nlri"]["next_hop"], [IP6Address.from_string("2001:db1::2")])
+        self.assertEqual(second_update.path_attributes["mp_reach_nlri"]["nlri"], [
+            IP6Prefix.from_string("2001:db6::/127")
+        ])
 
     def test_open_message_advances_to_idle_and_sends_notification(self):
         message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
@@ -276,10 +275,10 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
             "as_path" : "65032 65011 65002",
             "origin" : "EGP",
             "mp_reach_nlri" : {
-                "next_hop" : {
-                    "afi" : IP6Address.from_string("2001:db8:1::242:ac11:2"),
-                    "safi" : IP6Address.from_string("fe80::42:acff:fe11:2"),
-                },
+                "next_hop" : [
+                    IP6Address.from_string("2001:db8:1::242:ac11:2"),
+                    IP6Address.from_string("fe80::42:acff:fe11:2"),
+                ],
                 "nlri" : [
                     IP6Prefix.from_string("2001:db4::/127"),
                 ]
