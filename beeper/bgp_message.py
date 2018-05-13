@@ -235,10 +235,34 @@ def pack_as_path(as_path):
 def pack_next_hop(next_hop):
     return next_hop.address
 
+def pack_nlri6(nlri):
+    packed_nlri = []
+
+    for prefix in nlri:
+        packed_prefix = struct.pack("!B", prefix.length) + pack_prefix(prefix.prefix, prefix.length)
+        packed_nlri.append(packed_prefix)
+
+    return b"".join(packed_nlri)
+
+def pack_mp_reach_nlri(mp_reach_nlri):
+    packed_path = struct.pack(
+        "!HBB16s16sB",
+        IP6_AFI,
+        UNICAST_SAFI,
+        IP6_UNICAST_LENGTH,
+        mp_reach_nlri["next_hop"]["afi"].address,
+        mp_reach_nlri["next_hop"]["safi"].address,
+        0
+    )
+    packed_nlri = pack_nlri6(mp_reach_nlri["nlri"])
+
+    return packed_path + packed_nlri
+
 attribute_packers = {
     "origin": pack_origin,
     "as_path": pack_as_path,
-    "next_hop": pack_next_hop
+    "next_hop": pack_next_hop,
+    "mp_reach_nlri" : pack_mp_reach_nlri
 }
 
 attribute_numbers = {
@@ -253,8 +277,8 @@ attribute_flags = {
     "origin" : 0x40,
     "as_path" : 0x40,
     "next_hop" : 0x40,
-    #"mp_reach_nlri" : 14,
-    #"mp_unreach_nlri" : 15,
+    "mp_reach_nlri" : 0x80,
+    #"mp_unreach_nlri" : 0x40,
 }
 
 def parse_path_attributes(serialised_path_attributes):
