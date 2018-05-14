@@ -4,6 +4,7 @@ from beka.event import Event, EventTimerExpired, EventMessageReceived, EventShut
 from beka.ip import IP4Prefix, IP4Address
 from beka.ip import IP6Prefix, IP6Address
 from beka.route import RouteAddition, RouteRemoval
+from beka.error import IdleError
 
 import time
 import unittest
@@ -24,8 +25,10 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.output_messages.qsize(), 0)
 
     def test_shutdown_message_advances_to_idle(self):
-        self.state_machine.event(EventShutdown(), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventShutdown(), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
+        self.assertTrue("Shutdown requested" in str(context.exception))
 
     def test_timer_expired_event_does_nothing(self):
         self.tick += 3600
@@ -37,7 +40,7 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.route_updates.qsize(), 0)
 
     def test_open_message_advances_to_open_confirm_and_sets_timers(self):
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), {"multiprotocol": "ipv4-unicast"})
         self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "open_confirm")
         self.assertEqual(self.state_machine.output_messages.qsize(), 2)
@@ -48,12 +51,14 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
 
     def test_keepalive_message_advances_to_idle(self):
         message = BgpKeepaliveMessage()
-        self.state_machine.event(EventMessageReceived(message), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
 
     def test_notification_message_advances_to_idle(self):
         message = BgpNotificationMessage(0, 0, b"")
-        self.state_machine.event(EventMessageReceived(message), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
 
     def test_update_message_advances_to_idle(self):
@@ -63,14 +68,15 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
             "origin" : "EGP"
             }
         message = BgpUpdateMessage([], path_attributes, [IP4Prefix.from_string("192.168.0.0/16")])
-        self.state_machine.event(EventMessageReceived(message), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
 
 class StateMachineOpenConfirmTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
         self.state_machine = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), {"multiprotocol": "ipv4-unicast"})
         self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "open_confirm")
         for _ in range(self.state_machine.output_messages.qsize()):
@@ -79,7 +85,9 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.old_keepalive_timer = self.state_machine.timers["keepalive"]
 
     def test_shutdown_message_advances_to_idle_and_sends_notification(self):
-        self.state_machine.event(EventShutdown(), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventShutdown(), self.tick)
+        self.assertTrue("Shutdown requested" in str(context.exception))
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
@@ -89,7 +97,8 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
     def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
         self.tick = self.old_hold_timer
         self.state_machine.timers["hold"] = self.tick - 3600
-        self.state_machine.event(EventTimerExpired(), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
@@ -107,7 +116,8 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
 
     def test_notification_message_advances_to_idle(self):
         message = BgpNotificationMessage(0, 0, b"")
-        self.state_machine.event(EventMessageReceived(message), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
 
     def test_keepalive_message_advances_to_established_and_resets_hold_timer(self):
@@ -200,8 +210,9 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         ])
 
     def test_open_message_advances_to_idle_and_sends_notification(self):
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
-        self.state_machine.event(EventMessageReceived(message), self.tick)
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), {"multiprotocol": "ipv4-unicast"})
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
@@ -215,7 +226,8 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
             "origin" : "EGP"
             }
         message = BgpUpdateMessage([], path_attributes, [IP4Prefix.from_string("192.168.0.0/16")])
-        self.state_machine.event(EventMessageReceived(message), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
@@ -226,7 +238,7 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
         self.state_machine = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), {"multiprotocol": "ipv4-unicast"})
         self.state_machine.event(EventMessageReceived(message), self.tick)
         for _ in range(self.state_machine.output_messages.qsize()):
             self.state_machine.output_messages.get()
@@ -297,7 +309,9 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.route_updates.get(), RouteAddition(**route_attributes))
 
     def test_shutdown_message_advances_to_idle_and_sends_notification(self):
-        self.state_machine.event(EventShutdown(), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventShutdown(), self.tick)
+        self.assertTrue("Shutdown requested" in str(context.exception))
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
@@ -307,7 +321,8 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
     def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
         self.tick = self.old_hold_timer
         self.state_machine.timers["hold"] = self.tick - 3600
-        self.state_machine.event(EventTimerExpired(), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
@@ -316,12 +331,14 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
 
     def test_notification_message_advances_to_idle(self):
         message = BgpNotificationMessage(0, 0, b"")
-        self.state_machine.event(EventMessageReceived(message), self.tick)
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
 
     def test_open_message_advances_to_idle_and_sends_notification(self):
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), build_byte_string("010400020001"))
-        self.state_machine.event(EventMessageReceived(message), self.tick)
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), {"multiprotocol": "ipv4-unicast"})
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()

@@ -85,7 +85,7 @@ class Beka(object):
             neighbor=peer["peer_ip"]
         )
         state_machine.routes_to_advertise = copy(self.routes_to_advertise)
-        peering = Peering(state_machine, address, socket, self.route_handler)
+        peering = Peering(state_machine, address, socket, self.route_handler, error_handler=self.error_handler)
         self.peerings.append(peering)
         self.peer_up_handler(peer_ip, peer["peer_as"])
         peering.run()

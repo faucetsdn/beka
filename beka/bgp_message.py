@@ -137,7 +137,7 @@ class BgpOpenMessage(BgpMessage):
         self.capabilities = capabilities
 
     @classmethod
-    def parse(cls, serialised_message):
+    def parse(cls, serialised_message, _fourbyteas):
         version, peer_as, hold_time, identifier, _optional_parameters_length = struct.unpack(
             "!BHH4sB",
             serialised_message[:10]
@@ -429,7 +429,7 @@ attribute_flags = {
     "as4_path" : 0xc0,
 }
 
-def parse_path_attributes(serialised_path_attributes):
+def parse_path_attributes(serialised_path_attributes, fourbyteas):
     stream = BytesIO(serialised_path_attributes)
     path_attributes = {}
 
@@ -443,7 +443,10 @@ def parse_path_attributes(serialised_path_attributes):
         if type_code in attribute_parsers:
             # TODO we're ignoring the flags here, these should at very least be preserved
             # this is tightly coupled, there's gotta be a better way to do this
-            path_attributes[attribute_keys[type_code]] = attribute_parsers[type_code](packed_attribute)
+            if fourbyteas and attribute_keys[type_code] == "as_path":
+                path_attributes["as_path"] = parse_as4_path(packed_attribute)
+            else:
+                path_attributes[attribute_keys[type_code]] = attribute_parsers[type_code](packed_attribute)
         else:
             print("WARNING did not recognise BGP path attribute type %d" % type_code)
 
@@ -481,7 +484,7 @@ class BgpUpdateMessage(BgpMessage):
         self.nlri = nlri
 
     @classmethod
-    def parse(cls, serialised_message):
+    def parse(cls, serialised_message, fourbyteas):
         data_stream = BytesIO(serialised_message)
         withdrawn_routes_length = bytes_to_short(data_stream.read(2))
         serialised_withdrawn_routes = data_stream.read(withdrawn_routes_length)
@@ -489,18 +492,18 @@ class BgpUpdateMessage(BgpMessage):
 
         total_path_attribute_length = bytes_to_short(data_stream.read(2))
         serialised_path_attributes = data_stream.read(total_path_attribute_length)
-        path_attributes = parse_path_attributes(serialised_path_attributes)
+        path_attributes = parse_path_attributes(serialised_path_attributes, fourbyteas)
 
         serialised_nlri = data_stream.read()
         nlri = parse_nlri(serialised_nlri)
 
         return cls(withdrawn_routes, path_attributes, nlri)
 
-    def pack(self):
+    def pack(self, fourbyteas=None):
         # TODO pack withdrawn routes
         packed_withdrawn_routes = self.pack_withdrawn_routes()
         packed_withdrawn_routes_length = struct.pack("!H", len(packed_withdrawn_routes))
-        packed_path_attributes = self.pack_path_attributes()
+        packed_path_attributes = self.pack_path_attributes(fourbyteas)
         packed_path_attributes_length = struct.pack("!H", len(packed_path_attributes))
         packed_nlri = self.pack_nlri()
         return packed_withdrawn_routes_length + \
@@ -518,11 +521,14 @@ class BgpUpdateMessage(BgpMessage):
 
         return b"".join(packed_routes_list)
 
-    def pack_path_attributes(self):
+    def pack_path_attributes(self, fourbyteas):
         packed_path_attributes = []
         sorted_attribute_pairs = sorted(self.path_attributes.items(), key=lambda x: PATH_ATTRIBUTE_ORDER[x[0]])
         for name, path_attribute in sorted_attribute_pairs:
-            packed_entry = attribute_packers[name](path_attribute)
+            if fourbyteas and name=="as_path":
+                packed_entry = pack_as4_path(path_attribute)
+            else:
+                packed_entry = attribute_packers[name](path_attribute)
             packed_header = struct.pack(
                 "!BBB",
                 attribute_flags[name],
@@ -566,7 +572,7 @@ class BgpNotificationMessage(BgpMessage):
         self.data = data
 
     @classmethod
-    def parse(cls, serialised_message):
+    def parse(cls, serialised_message, _fourbyteas):
         error_code, error_subcode = struct.unpack("!BB", serialised_message[:2])
         data = serialised_message[2:]
         return cls(error_code, error_subcode, data)
@@ -590,7 +596,7 @@ class BgpKeepaliveMessage(BgpMessage):
         self.type = self.KEEPALIVE_MESSAGE
 
     @classmethod
-    def parse(cls, serialised_message):
+    def parse(cls, serialised_message, _fourbyteas):
         return cls()
 
     def pack(self):
@@ -609,5 +615,5 @@ PARSERS = {
     BgpMessage.KEEPALIVE_MESSAGE: BgpKeepaliveMessage,
 }
 
-def parse_bgp_message(message_type, serialised_message):
-    return PARSERS[message_type].parse(serialised_message)
+def parse_bgp_message(message_type, serialised_message, fourbyteas=None):
+    return PARSERS[message_type].parse(serialised_message, fourbyteas)
