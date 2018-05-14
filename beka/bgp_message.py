@@ -216,6 +216,22 @@ def parse_origin(packed_origin):
 AS_SET_CODE = 1
 AS_SEQUENCE_CODE = 2
 AS_NUMBER_LENGTH = 2
+AS4_NUMBER_LENGTH = 4
+
+def parse_as4_path(packed_as_path):
+    # this does as_sets wrong, assumes everything is as_sequence
+    input_stream = BytesIO(packed_as_path)
+    as_numbers = []
+    while True:
+        packed_type_and_count = input_stream.read(2)
+        if len(packed_type_and_count) == 0:
+            break
+        type_code, count = struct.unpack("!BB", packed_type_and_count)
+        if type_code == AS_SET_CODE:
+            print("WARNING received update with AS_SET, treating like AS_SEQUENCE")
+        packed_as_sequence = input_stream.read(count * AS4_NUMBER_LENGTH)
+        as_numbers += struct.unpack("!" + ("I" * count), packed_as_sequence)
+    return " ".join(["%d" % x for x in as_numbers])
 
 def parse_as_path(packed_as_path):
     # this does as_sets wrong, assumes everything is as_sequence
@@ -302,6 +318,7 @@ attribute_parsers = {
     3: parse_next_hop,
     14: parse_mp_reach_nlri,
     15: parse_mp_unreach_nlri,
+    17: parse_as4_path,
 }
 
 attribute_keys = {
@@ -310,6 +327,7 @@ attribute_keys = {
     3: "next_hop",
     14: "mp_reach_nlri",
     15: "mp_unreach_nlri",
+    17: "as4_path",
 }
 
 ORIGIN_NUMBERS = {
@@ -321,9 +339,25 @@ ORIGIN_NUMBERS = {
 def pack_origin(origin):
     return struct.pack("!B", ORIGIN_NUMBERS[origin])
 
+def pack_as4_path(as_path):
+    if not as_path:
+        return b""
+
+    as_numbers = [int(x) for x in as_path.split(" ")]
+    count = len(as_numbers)
+    header = struct.pack("!BB", AS_SEQUENCE_CODE, count)
+    body = struct.pack("!" + ("I" * count), *as_numbers)
+    return header + body
+
 def pack_as_path(as_path):
-    # TODO actually do this
-    return b""
+    if not as_path:
+        return b""
+
+    as_numbers = [int(x) for x in as_path.split(" ")]
+    count = len(as_numbers)
+    header = struct.pack("!BB", AS_SEQUENCE_CODE, count)
+    body = struct.pack("!" + ("H" * count), *as_numbers)
+    return header + body
 
 def pack_next_hop(next_hop):
     return next_hop.address
@@ -373,7 +407,8 @@ attribute_packers = {
     "as_path": pack_as_path,
     "next_hop": pack_next_hop,
     "mp_reach_nlri" : pack_mp_reach_nlri,
-    "mp_unreach_nlri" : pack_mp_unreach_nlri
+    "mp_unreach_nlri" : pack_mp_unreach_nlri,
+    "as4_path": pack_as4_path,
 }
 
 attribute_numbers = {
@@ -382,6 +417,7 @@ attribute_numbers = {
     "next_hop" : 3,
     "mp_reach_nlri" : 14,
     "mp_unreach_nlri" : 15,
+    "as4_path" : 17,
 }
 
 attribute_flags = {
@@ -390,6 +426,7 @@ attribute_flags = {
     "next_hop" : 0x40,
     "mp_reach_nlri" : 0x80,
     "mp_unreach_nlri" : 0x80,
+    "as4_path" : 0xc0,
 }
 
 def parse_path_attributes(serialised_path_attributes):
@@ -426,6 +463,15 @@ def parse_withdrawn_routes(serialised_withdrawn_routes):
         prefixes.append(IP4Prefix(prefix, prefix_length))
 
     return prefixes
+
+PATH_ATTRIBUTE_ORDER = {
+    "origin" : 1,
+    "as_path" : 2,
+    "as4_path" : 3,
+    "next_hop" : 4,
+    "mp_reach_nlri" : 5,
+    "mp_unreach_nlri" : 6,
+}
 
 class BgpUpdateMessage(BgpMessage):
     def __init__(self, withdrawn_routes, path_attributes, nlri):
@@ -474,7 +520,7 @@ class BgpUpdateMessage(BgpMessage):
 
     def pack_path_attributes(self):
         packed_path_attributes = []
-        sorted_attribute_pairs = sorted(self.path_attributes.items(), key=lambda x: attribute_numbers[x[0]])
+        sorted_attribute_pairs = sorted(self.path_attributes.items(), key=lambda x: PATH_ATTRIBUTE_ORDER[x[0]])
         for name, path_attribute in sorted_attribute_pairs:
             packed_entry = attribute_packers[name](path_attribute)
             packed_header = struct.pack(

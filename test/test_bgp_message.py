@@ -111,6 +111,29 @@ class BgpMessageTestCase(unittest.TestCase):
         message = BgpUpdateMessage([], path_attributes, nlri)
         self.assertEquals(message.pack(), expected_serialised_message)
 
+    def test_update_message_new_routes_parses_4_byte_asn(self):
+        serialised_message = build_byte_string("000000274001010040020802035ba0fe08fdebc0110e020300bc614e0000fe080000fdeb400304ac1900042009090909")
+        message = parse_bgp_message(BgpMessage.UPDATE_MESSAGE, serialised_message)
+        self.assertEqual(message.nlri, [IP4Prefix.from_string("9.9.9.9/32")])
+        self.assertEqual(message.path_attributes["next_hop"], IP4Address.from_string("172.25.0.4"))
+        self.assertEqual(message.path_attributes["origin"], "IGP")
+        self.assertEqual(message.path_attributes["as_path"], "23456 65032 65003")
+        self.assertEqual(message.path_attributes["as4_path"], "12345678 65032 65003")
+
+    def test_update_message_new_routes_packs_4_byte_asn(self):
+        expected_serialised_message = build_byte_string("000000274001010040020802035ba0fe08fdebc0110e020300bc614e0000fe080000fdeb400304ac1900042009090909")
+        nlri = [
+            IP4Prefix.from_string("9.9.9.9/32"),
+        ]
+        path_attributes = {
+            "next_hop": IP4Address.from_string("172.25.0.4"),
+            "origin": "IGP",
+            "as_path": "23456 65032 65003",
+            "as4_path": "12345678 65032 65003"
+        }
+        message = BgpUpdateMessage([], path_attributes, nlri)
+        self.assertEquals(message.pack(), expected_serialised_message)
+
     def test_update_message_withdrawn_routes_parses(self):
         serialised_message = build_byte_string("0004180a01010000")
         message = parse_bgp_message(BgpMessage.UPDATE_MESSAGE, serialised_message)
