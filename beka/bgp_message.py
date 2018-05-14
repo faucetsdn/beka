@@ -117,15 +117,30 @@ def pack_capabilities(capabilities):
     packed_capabilities = b"".join(packed_capability_list)
     return packed_capabilities
 
+def merge_dict_of_lists(main_dict, new_dict):
+    for key, new_list in new_dict.items():
+        if key not in main_dict:
+            main_dict[key] = new_list
+        else:
+            main_dict[key] += new_list
+
 def parse_optional_parameters(serialised_optional_parameters):
     stream = BytesIO(serialised_optional_parameters)
-    parameter_type, parameter_length = struct.unpack("!BB", stream.read(2))
-    if parameter_type != OPTIONAL_PARAMETER_CAPABILITY:
-        raise ValueError("OPEN: Got unsupported optional parameter: %d" % parameter_type)
-    serialised_capabilities = stream.read()
-    if len(serialised_capabilities) != parameter_length:
-        raise ValueError("OPEN: Got unsupported optional parameter after capabilities: %s" % str(serialised_capabilities))
-    return parse_capabilities(serialised_capabilities);
+    capabilities = {}
+
+    while True:
+        serialised_header = stream.read(2)
+        if len(serialised_header) == 0:
+            break
+        parameter_type, parameter_length = struct.unpack("!BB", serialised_header)
+        if parameter_type != OPTIONAL_PARAMETER_CAPABILITY:
+            raise ValueError("OPEN: Got unsupported optional parameter: %d" % parameter_type)
+        serialised_capabilities = stream.read(parameter_length)
+
+        next_capabilities = parse_capabilities(serialised_capabilities)
+        merge_dict_of_lists(capabilities, next_capabilities)
+
+    return capabilities
 
 class BgpOpenMessage(BgpMessage):
     def __init__(self, version, peer_as, hold_time, identifier, capabilities):
@@ -138,11 +153,11 @@ class BgpOpenMessage(BgpMessage):
 
     @classmethod
     def parse(cls, serialised_message, _fourbyteas):
-        version, peer_as, hold_time, identifier, _optional_parameters_length = struct.unpack(
+        version, peer_as, hold_time, identifier, optional_parameters_length = struct.unpack(
             "!BHH4sB",
             serialised_message[:10]
         )
-        capabilities = parse_optional_parameters(serialised_message[10:10+_optional_parameters_length])
+        capabilities = parse_optional_parameters(serialised_message[10:10+optional_parameters_length])
         return cls(version, peer_as, hold_time, IP4Address(identifier), capabilities)
 
     def pack(self):

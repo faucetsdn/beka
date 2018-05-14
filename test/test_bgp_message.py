@@ -49,6 +49,16 @@ class BgpMessageTestCase(unittest.TestCase):
         self.assertEqual(message.capabilities["multiprotocol"], ["ipv6-unicast"])
         self.assertEqual(message.capabilities["routerefresh"], [True])
 
+    def test_open_message_parses_exabgp_optional_params(self):
+        serialised_message = build_byte_string("04fe0900b4c0a8000f9402060104000100010206010400010002020601040001000402060104000100800206010400010084020601040001008502060104000100860206010400020001020601040002000202060104000200040206010400020080020601040002008502060104000200860206010400190041020601040019004602060104400400470206010440040048020206000206410400010001")
+        message = parse_bgp_message(BgpMessage.OPEN_MESSAGE, serialised_message, None)
+        self.assertEqual(message.version, 4)
+        self.assertEqual(message.peer_as, 65033)
+        self.assertEqual(message.hold_time, 180)
+        self.assertEqual(message.identifier, IP4Address.from_string("192.168.0.15"))
+        self.assertTrue("ipv4-unicast" in message.capabilities["multiprotocol"])
+        self.assertTrue("ipv6-unicast" in message.capabilities["multiprotocol"])
+
     def test_open_message_packs(self):
         expected_serialised_message = build_byte_string("04fe0900b4c0a8000f080206010400010001")
         message = BgpOpenMessage(4, 65033, 180, IP4Address.from_string("192.168.0.15"), {"multiprotocol": ["ipv4-unicast"]})
