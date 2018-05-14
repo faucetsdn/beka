@@ -25,14 +25,107 @@ class BgpMessage(object):
             )
         return header + packed_message
 
+MULTIPROTOCOL_TYPES = {
+    (1, 1): "ipv4-unicast",
+    (2, 1): "ipv6-unicast"
+}
+
+def parse_multiprotocol(serialised_capability):
+    afi, reserved, safi = struct.unpack("!HBB", serialised_capability)
+    if (afi, safi) in MULTIPROTOCOL_TYPES:
+        return MULTIPROTOCOL_TYPES[(afi, safi)]
+    return (afi, safi)
+
+def parse_routerefresh(serialised_capability):
+    return True
+
+def parse_fourbyteas(serialised_capability):
+    peer_as, = struct.unpack("!I", serialised_capability)
+    return peer_as
+
+capability_parsers = {
+    1: parse_multiprotocol,
+    2: parse_routerefresh,
+    65: parse_fourbyteas
+}
+
+capability_keys = {
+    1: "multiprotocol",
+    2: "routerefresh",
+    65: "fourbyteas",
+}
+
+def parse_capabilities(serialised_capabilities):
+    stream = BytesIO(serialised_capabilities)
+    capabilities = {}
+
+    while True:
+        serialised_header = stream.read(2)
+        if len(serialised_header) == 0:
+            break
+        capability_code, capability_length = struct.unpack("!BB", serialised_header)
+        if capability_code in capability_keys:
+            capability_key = capability_keys[capability_code]
+            serialised_capability = stream.read(capability_length)
+            if capability_key not in capabilities:
+                capabilities[capability_key] = []
+            capabilities[capability_key].append(capability_parsers[capability_code](serialised_capability))
+        else:
+            print("WARNING did not recognise capability code %d" % capability_code)
+
+    return capabilities
+
+MULTIPROTOCOL_AFI_SAFI = {
+    "ipv4-unicast": (1, 1),
+    "ipv6-unicast": (2, 1),
+}
+
+def pack_multiprotocol(multiprotocol):
+    afi, safi = MULTIPROTOCOL_AFI_SAFI[multiprotocol]
+    return struct.pack("!HBB", afi, 0, safi)
+
+def pack_routerefresh(route_refresh):
+    return b""
+
+def pack_fourbyteas(fourbyteas):
+    return struct.pack("!I", fourbyteas)
+
+capability_packers = {
+    "multiprotocol": pack_multiprotocol,
+    "routerefresh": pack_routerefresh,
+    "fourbyteas": pack_fourbyteas,
+}
+
+capability_numbers = {
+    "multiprotocol": 1,
+    "routerefresh": 2,
+    "fourbyteas": 65,
+}
+
 OPTIONAL_PARAMETER_CAPABILITY = 2
+
+def pack_capabilities(capabilities):
+    packed_capability_list = []
+
+    for capability_key, capability_list in capabilities.items():
+        capability_code = capability_numbers[capability_key]
+        for capability in capability_list:
+            packed_body = capability_packers[capability_key](capability)
+            packed_header = struct.pack("!BB", capability_code, len(packed_body))
+            packed_capability_list.append(packed_header + packed_body)
+
+    packed_capabilities = b"".join(packed_capability_list)
+    return packed_capabilities
 
 def parse_optional_parameters(serialised_optional_parameters):
     stream = BytesIO(serialised_optional_parameters)
     parameter_type, parameter_length = struct.unpack("!BB", stream.read(2))
     if parameter_type != OPTIONAL_PARAMETER_CAPABILITY:
         raise ValueError("OPEN: Got unsupported optional parameter: %d" % parameter_type)
-    return stream.read()
+    serialised_capabilities = stream.read()
+    if len(serialised_capabilities) != parameter_length:
+        raise ValueError("OPEN: Got unsupported optional parameter after capabilities: %s" % str(serialised_capabilities))
+    return parse_capabilities(serialised_capabilities);
 
 class BgpOpenMessage(BgpMessage):
     def __init__(self, version, peer_as, hold_time, identifier, capabilities):
@@ -53,10 +146,11 @@ class BgpOpenMessage(BgpMessage):
         return cls(version, peer_as, hold_time, IP4Address(identifier), capabilities)
 
     def pack(self):
+        packed_capabilities = pack_capabilities(self.capabilities)
         capabilities_header = struct.pack(
             "!BB",
             OPTIONAL_PARAMETER_CAPABILITY,
-            len(self.capabilities))
+            len(packed_capabilities))
 
         return struct.pack(
             "!BHH4sB",
@@ -64,8 +158,8 @@ class BgpOpenMessage(BgpMessage):
             self.peer_as,
             self.hold_time,
             self.identifier.address,
-            len(capabilities_header + self.capabilities)
-        ) + capabilities_header + self.capabilities
+            len(capabilities_header + packed_capabilities)
+        ) + capabilities_header + packed_capabilities
 
     def __str__(self):
         return "BgpOpenMessage: Version %s, Peer AS: %s, Hold time: %s, Identifier: %s" % (

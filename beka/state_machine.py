@@ -76,8 +76,8 @@ class StateMachine:
         if message.type == BgpMessage.OPEN_MESSAGE:
             # TODO sanity check incoming open message
             # TODO advertise capabilities properly
-            ipv4_capabilities = b"\x01\x04\x00\x01\x00\x01"
-            ipv6_capabilities = b"\x01\x04\x00\x02\x00\x01"
+            ipv4_capabilities = {"multiprotocol": ["ipv4-unicast"]}
+            ipv6_capabilities = {"multiprotocol": ["ipv6-unicast"]}
             if isinstance(self.local_address, IP4Address):
                 capabilities = ipv4_capabilities
             elif isinstance(self.local_address, IP6Address):

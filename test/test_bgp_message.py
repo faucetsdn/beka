@@ -11,18 +11,58 @@ def build_byte_string(hex_stream):
     return struct.pack("!" + "B" * len(values), *values)
 
 class BgpMessageTestCase(unittest.TestCase):
-    def test_open_message_parses(self):
+    def test_open_message_parses_ipv4_multiprotocol(self):
+        serialised_message = build_byte_string("04fe0900b4c0a8000f080206010400010001")
+        message = parse_bgp_message(BgpMessage.OPEN_MESSAGE, serialised_message)
+        self.assertEqual(message.version, 4)
+        self.assertEqual(message.peer_as, 65033)
+        self.assertEqual(message.hold_time, 180)
+        self.assertEqual(message.identifier, IP4Address.from_string("192.168.0.15"))
+        self.assertEqual(message.capabilities["multiprotocol"], ["ipv4-unicast"])
+
+    def test_open_message_parses_ipv6_multiprotocol(self):
         serialised_message = build_byte_string("04fe0900b4c0a8000f080206010400020001")
         message = parse_bgp_message(BgpMessage.OPEN_MESSAGE, serialised_message)
         self.assertEqual(message.version, 4)
         self.assertEqual(message.peer_as, 65033)
         self.assertEqual(message.hold_time, 180)
         self.assertEqual(message.identifier, IP4Address.from_string("192.168.0.15"))
-        self.assertEqual(message.capabilities, build_byte_string("010400020001"))
+        self.assertEqual(message.capabilities["multiprotocol"], ["ipv6-unicast"])
+
+    def test_open_message_parses_multiprotocol_4_byte_asn(self):
+        serialised_message = build_byte_string("04fe0900b4c0a8000f0e020c01040001000141040000fdeb")
+        message = parse_bgp_message(BgpMessage.OPEN_MESSAGE, serialised_message)
+        self.assertEqual(message.version, 4)
+        self.assertEqual(message.peer_as, 65033)
+        self.assertEqual(message.hold_time, 180)
+        self.assertEqual(message.identifier, IP4Address.from_string("192.168.0.15"))
+        self.assertEqual(message.capabilities["multiprotocol"], ["ipv4-unicast"])
+        self.assertEqual(message.capabilities["fourbyteas"], [65003])
+
+    def test_open_message_parses_route_refresh(self):
+        serialised_message = build_byte_string("04fe0900b4c0a8000f0a02080104000200010200")
+        message = parse_bgp_message(BgpMessage.OPEN_MESSAGE, serialised_message)
+        self.assertEqual(message.version, 4)
+        self.assertEqual(message.peer_as, 65033)
+        self.assertEqual(message.hold_time, 180)
+        self.assertEqual(message.identifier, IP4Address.from_string("192.168.0.15"))
+        self.assertEqual(message.capabilities["multiprotocol"], ["ipv6-unicast"])
+        self.assertEqual(message.capabilities["routerefresh"], [True])
 
     def test_open_message_packs(self):
-        expected_serialised_message = build_byte_string("04fe0900b4c0a8000f080206010400020001")
-        message = BgpOpenMessage(4, 65033, 180, IP4Address.from_string("192.168.0.15"), build_byte_string("010400020001"))
+        expected_serialised_message = build_byte_string("04fe0900b4c0a8000f080206010400010001")
+        message = BgpOpenMessage(4, 65033, 180, IP4Address.from_string("192.168.0.15"), {"multiprotocol": ["ipv4-unicast"]})
+        serialised_message = message.pack()
+        self.assertEqual(serialised_message, expected_serialised_message)
+
+    def test_open_message_packs_capabilities(self):
+        expected_serialised_message = build_byte_string("04fe0900b4c0a8000f160214010400010001010400020001020041040000fdeb")
+        capabilities = {
+            "multiprotocol": ["ipv4-unicast", "ipv6-unicast"],
+            "routerefresh": [True],
+            "fourbyteas": [65003]
+        }
+        message = BgpOpenMessage(4, 65033, 180, IP4Address.from_string("192.168.0.15"), capabilities)
         serialised_message = message.pack()
         self.assertEqual(serialised_message, expected_serialised_message)
 
