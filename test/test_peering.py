@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock, patch, call
 
 from eventlet import GreenPool, sleep
 from eventlet.queue import Queue
@@ -20,6 +21,9 @@ class FakeStateMachine(object):
 class FakeSocket(object):
     def __init__(self):
         pass
+
+    def makefile(self, *args, **kwargs):
+        return None
 
 class FakeChopper(object):
     def __init__(self):
@@ -50,4 +54,13 @@ class PeeringTestCase(unittest.TestCase):
         self.assertEqual(self.route_catcher.route_updates[0], fake_route_update)
         eventlet.kill()
 
-
+    def test_run_starts_threads(self):
+        with patch("beka.peering.GreenPool") as GreenPool:
+            self.peering.run()
+        GreenPool().spawn.assert_has_calls([
+            call(self.peering.send_messages),
+            call(self.peering.print_route_updates),
+            call(self.peering.kick_timers),
+            call(self.peering.receive_messages),
+        ])
+        GreenPool().waitall.assert_called_once()
