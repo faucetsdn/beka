@@ -1,10 +1,8 @@
 import struct
 from .error import SocketClosedError
+from .bgp_message import BgpMessage
 
 class Chopper(object):
-    BGP_MARKER = b"\xFF" * 16
-    HEADER_LENGTH = 19
-
     def __init__(self, input_stream):
         self.input_stream = input_stream
 
@@ -16,7 +14,7 @@ class Chopper(object):
 
     def next(self):
         header, length, message_type = self.load_header()
-        extra_data_length = length - self.HEADER_LENGTH
+        extra_data_length = length - BgpMessage.HEADER_LENGTH
         if extra_data_length > 0:
             serialised_body = self.input_stream.read(extra_data_length)
             if len(serialised_body) < extra_data_length:
@@ -36,7 +34,7 @@ class Chopper(object):
 
         marker, length, message_type = struct.unpack("!16sHB", header)
 
-        if marker == self.BGP_MARKER:
+        if marker == BgpMessage.MARKER:
             return header, length, message_type
         else:
             raise ValueError("BGP marker missing")

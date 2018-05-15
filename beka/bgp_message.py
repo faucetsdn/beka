@@ -13,18 +13,6 @@ class BgpMessage(object):
     MARKER = b"\xFF" * 16
     HEADER_LENGTH = 19
 
-    @classmethod
-    def pack(cls, message):
-        packed_message = message.pack()
-        length = cls.HEADER_LENGTH + len(packed_message)
-        header = struct.pack(
-            "!16sHB",
-            cls.MARKER,
-            length,
-            message.MSG_TYPE
-            )
-        return header + packed_message
-
 PARSERS = {}
 
 class BgpMessageParser(object):
@@ -37,6 +25,21 @@ class BgpMessageParser(object):
 def register_parser(cls):
     PARSERS[cls.MSG_TYPE] = cls.parse
     return cls
+
+class BgpMessagePacker(object):
+    def __init__(self):
+        self.capabilities = {}
+
+    def pack(self, message):
+        packed_message = message.pack(self.capabilities)
+        length = BgpMessage.HEADER_LENGTH + len(packed_message)
+        header = struct.pack(
+            "!16sHB",
+            BgpMessage.MARKER,
+            length,
+            message.MSG_TYPE
+            )
+        return header + packed_message
 
 MULTIPROTOCOL_TYPES = {
     (1, 1): "ipv4-unicast",
@@ -175,7 +178,7 @@ class BgpOpenMessage(BgpMessage):
         capabilities = parse_optional_parameters(serialised_message[10:10+optional_parameters_length])
         return cls(version, peer_as, hold_time, IP4Address(identifier), capabilities)
 
-    def pack(self):
+    def pack(self, _capabilities):
         packed_capabilities = pack_capabilities(self.capabilities)
         capabilities_header = struct.pack(
             "!BB",
@@ -531,11 +534,11 @@ class BgpUpdateMessage(BgpMessage):
 
         return cls(withdrawn_routes, path_attributes, nlri)
 
-    def pack(self, fourbyteas=None):
+    def pack(self, capabilities):
         # TODO pack withdrawn routes
         packed_withdrawn_routes = self.pack_withdrawn_routes()
         packed_withdrawn_routes_length = struct.pack("!H", len(packed_withdrawn_routes))
-        packed_path_attributes = self.pack_path_attributes(fourbyteas)
+        packed_path_attributes = self.pack_path_attributes("fourbyteas" in capabilities)
         packed_path_attributes_length = struct.pack("!H", len(packed_path_attributes))
         packed_nlri = self.pack_nlri()
         return packed_withdrawn_routes_length + \
@@ -611,7 +614,7 @@ class BgpNotificationMessage(BgpMessage):
         data = serialised_message[2:]
         return cls(error_code, error_subcode, data)
 
-    def pack(self):
+    def pack(self, _capabilities):
         return struct.pack(
             "!BB",
             self.error_code,
@@ -636,7 +639,7 @@ class BgpKeepaliveMessage(BgpMessage):
     def parse(cls, serialised_message, _capabilities):
         return cls()
 
-    def pack(self):
+    def pack(self, _capabilities):
         return b""
 
     def __eq__(self, other):

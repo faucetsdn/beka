@@ -4,7 +4,7 @@ import eventlet.greenthread as greenthread
 
 from .chopper import Chopper
 from .event import EventTimerExpired, EventMessageReceived
-from .bgp_message import BgpMessage, BgpMessageParser
+from .bgp_message import BgpMessage, BgpMessageParser, BgpMessagePacker
 from .route import RouteAddition, RouteRemoval
 from .error import SocketClosedError, IdleError
 
@@ -28,6 +28,7 @@ class Peering(object):
         self.chopper = Chopper(self.input_stream)
         self.pool = GreenPool()
         self.parser = BgpMessageParser()
+        self.packer = BgpMessagePacker()
         self.state_machine.open_handler = self.open_handler
         self.eventlets = []
 
@@ -40,6 +41,7 @@ class Peering(object):
 
     def open_handler(self, capabilities):
         self.parser.capabilities = capabilities
+        self.packer.capabilities = capabilities
 
     def receive_messages(self):
         while True:
@@ -66,12 +68,12 @@ class Peering(object):
         while True:
             sleep(0)
             message = self.state_machine.output_messages.get()
-            self.socket.send(BgpMessage.pack(message))
+            self.socket.send(self.packer.pack(message))
 
     def empty_message_queue(self):
         while self.state_machine.output_messages.qsize():
             message = self.state_machine.output_messages.get()
-            self.socket.send(BgpMessage.pack(message))
+            self.socket.send(self.packer.pack(message))
 
     def print_route_updates(self):
         while True:

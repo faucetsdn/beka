@@ -1,4 +1,4 @@
-from beka.bgp_message import BgpMessage, BgpMessageParser, BgpOpenMessage
+from beka.bgp_message import BgpMessage, BgpMessageParser, BgpMessagePacker, BgpOpenMessage
 from beka.bgp_message import BgpUpdateMessage, BgpNotificationMessage, BgpKeepaliveMessage
 from beka.ip import IP4Prefix, IP4Address
 from beka.ip import IP6Prefix, IP6Address
@@ -62,8 +62,8 @@ class BgpMessageTestCase(unittest.TestCase):
     def test_open_message_packs(self):
         expected_serialised_message = build_byte_string("04fe0900b4c0a8000f080206010400010001")
         message = BgpOpenMessage(4, 65033, 180, IP4Address.from_string("192.168.0.15"), {"multiprotocol": ["ipv4-unicast"]})
-        serialised_message = message.pack()
-        self.assertEqual(serialised_message, expected_serialised_message)
+        serialised_message = BgpMessagePacker().pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
     def test_open_message_packs_capabilities(self):
         expected_serialised_message = build_byte_string("04fe0900b4c0a8000f160214010400010001010400020001020041040000fdeb")
@@ -73,8 +73,8 @@ class BgpMessageTestCase(unittest.TestCase):
             "fourbyteas": [65003]
         }
         message = BgpOpenMessage(4, 65033, 180, IP4Address.from_string("192.168.0.15"), capabilities)
-        serialised_message = message.pack()
-        self.assertEqual(serialised_message, expected_serialised_message)
+        serialised_message = BgpMessagePacker().pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
     def test_keepalive_message_parses(self):
         serialised_message = b""
@@ -83,8 +83,8 @@ class BgpMessageTestCase(unittest.TestCase):
     def test_keepalive_message_packs(self):
         expected_serialised_message = b""
         message = BgpKeepaliveMessage()
-        serialised_message = message.pack()
-        self.assertEqual(serialised_message, expected_serialised_message)
+        serialised_message = BgpMessagePacker().pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
     def test_notification_message_parses(self):
         serialised_message = build_byte_string("0202feb0")
@@ -96,8 +96,8 @@ class BgpMessageTestCase(unittest.TestCase):
     def test_notification_message_packs(self):
         expected_serialised_message = build_byte_string("0202feb0")
         message = BgpNotificationMessage(2, 2, b"\xfe\xb0")
-        serialised_message = message.pack()
-        self.assertEqual(serialised_message, expected_serialised_message)
+        serialised_message = BgpMessagePacker().pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
     def test_update_message_new_routes_parses(self):
         serialised_message = build_byte_string("0000000e40010101400200400304c0a80021080a")
@@ -119,7 +119,8 @@ class BgpMessageTestCase(unittest.TestCase):
             "as_path": ""
         }
         message = BgpUpdateMessage([], path_attributes, nlri)
-        self.assertEquals(message.pack(), expected_serialised_message)
+        serialised_message = BgpMessagePacker().pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
     def test_update_message_new_routes_parses_as4(self):
         serialised_message = build_byte_string("000000274001010040020802035ba0fe08fdebc0110e020300bc614e0000fe080000fdeb400304ac1900042009090909")
@@ -142,13 +143,14 @@ class BgpMessageTestCase(unittest.TestCase):
             "as4_path": "12345678 65032 65003"
         }
         message = BgpUpdateMessage([], path_attributes, nlri)
-        self.assertEquals(message.pack(), expected_serialised_message)
+        serialised_message = BgpMessagePacker().pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
     def test_update_message_new_routes_parses_as4_new(self):
         serialised_message = build_byte_string("0000001c4001010040020e020300bc614e0000fe080001b2e5400304ac1900042009090909")
         parser = BgpMessageParser()
         parser.capabilities = {
-            "fourbyteas": True
+            "fourbyteas": 12345
         }
         message = parser.parse(BgpMessage.UPDATE_MESSAGE, serialised_message)
         self.assertEqual(message.nlri, [IP4Prefix.from_string("9.9.9.9/32")])
@@ -167,7 +169,10 @@ class BgpMessageTestCase(unittest.TestCase):
             "as_path": "12345678 65032 111333"
         }
         message = BgpUpdateMessage([], path_attributes, nlri)
-        self.assertEquals(message.pack(fourbyteas=True), expected_serialised_message)
+        packer = BgpMessagePacker()
+        packer.capabilities = {"fourbyteas": 12345}
+        serialised_message = packer.pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
     def test_update_message_withdrawn_routes_parses(self):
         serialised_message = build_byte_string("0004180a01010000")
@@ -177,7 +182,8 @@ class BgpMessageTestCase(unittest.TestCase):
     def test_update_message_withdrawn_routes_packs(self):
         expected_serialised_message = build_byte_string("0004180a01010000")
         message = BgpUpdateMessage([IP4Prefix.from_string("10.1.1.0/24")], {}, [])
-        self.assertEqual(message.pack(), expected_serialised_message)
+        serialised_message = BgpMessagePacker().pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
     def test_update_v6_message_new_routes_parses(self):
         serialised_message = build_byte_string("0000004b400101004002040201fdeb800e3d0002012020010db80001000000000242ac110002fe800000000000000042acfffe110002007f20010db40000000000000000000000002f20010db30000")
@@ -216,7 +222,8 @@ class BgpMessageTestCase(unittest.TestCase):
         }
 
         message = BgpUpdateMessage([], path_attributes, [])
-        self.assertEqual(message.pack(), expected_serialised_message)
+        serialised_message = BgpMessagePacker().pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
     def test_update_v6_message_new_routes_packs(self):
         expected_serialised_message = build_byte_string("0000004740010100400200800e3d0002012020010db80001000000000242ac110002fe800000000000000042acfffe110002007f20010db40000000000000000000000002f20010db30000")
@@ -235,5 +242,6 @@ class BgpMessageTestCase(unittest.TestCase):
             }
         }
         message = BgpUpdateMessage([], path_attributes, [])
-        self.assertEquals(message.pack(), expected_serialised_message)
+        serialised_message = BgpMessagePacker().pack(message)
+        self.assertEqual(serialised_message[19:], expected_serialised_message)
 
