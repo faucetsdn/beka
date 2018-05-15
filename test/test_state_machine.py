@@ -8,6 +8,7 @@ from beka.error import IdleError
 
 import time
 import unittest
+from unittest.mock import MagicMock
 import socket
 import struct
 
@@ -18,7 +19,8 @@ def build_byte_string(hex_stream):
 class StateMachinePassiveActiveTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
-        self.state_machine = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240)
+        self.open_handler = MagicMock()
+        self.state_machine = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240, open_handler=self.open_handler)
         self.old_hold_timer = self.state_machine.timers["hold"]
         self.old_keepalive_timer = self.state_machine.timers["keepalive"]
         self.assertEqual(self.state_machine.state, "active")
@@ -40,10 +42,12 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.route_updates.qsize(), 0)
 
     def test_open_message_advances_to_open_confirm_and_sets_timers(self):
-        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), {"multiprotocol": "ipv4-unicast"})
+        capabilities = {"multiprotocol": "ipv4-unicast"}
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), capabilities)
         self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "open_confirm")
         self.assertEqual(self.state_machine.output_messages.qsize(), 2)
+        self.open_handler.assert_called_with(capabilities)
         self.assertTrue(isinstance(self.state_machine.output_messages.get(), BgpOpenMessage))
         self.assertTrue(isinstance(self.state_machine.output_messages.get(), BgpKeepaliveMessage))
         self.assertEqual(self.state_machine.timers["hold"], self.tick)

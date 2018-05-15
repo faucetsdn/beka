@@ -4,7 +4,7 @@ import eventlet.greenthread as greenthread
 
 from .chopper import Chopper
 from .event import EventTimerExpired, EventMessageReceived
-from .bgp_message import BgpMessage, parse_bgp_message
+from .bgp_message import BgpMessage, BgpMessageParser
 from .route import RouteAddition, RouteRemoval
 from .error import SocketClosedError, IdleError
 
@@ -27,6 +27,8 @@ class Peering(object):
         self.input_stream = self.socket.makefile(mode="rb")
         self.chopper = Chopper(self.input_stream)
         self.pool = GreenPool()
+        self.parser = BgpMessageParser()
+        self.state_machine.open_handler = self.open_handler
         self.eventlets = []
 
         self.eventlets.append(self.pool.spawn(self.send_messages))
@@ -35,6 +37,9 @@ class Peering(object):
         self.eventlets.append(self.pool.spawn(self.receive_messages))
 
         self.pool.waitall()
+
+    def open_handler(self, capabilities):
+        self.parser.capabilities = capabilities
 
     def receive_messages(self):
         while True:
@@ -46,7 +51,7 @@ class Peering(object):
                     self.error_handler("Peering %s: %s" % (self.peer_address, e))
                 self.shutdown()
                 break
-            message = parse_bgp_message(message_type, serialised_message, self.state_machine.fourbyteas)
+            message = self.parser.parse(message_type, serialised_message)
             event = EventMessageReceived(message)
             tick = int(time.time())
             try:

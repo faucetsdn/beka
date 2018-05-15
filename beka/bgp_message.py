@@ -27,8 +27,12 @@ class BgpMessage(object):
 
 PARSERS = {}
 
-def parse_bgp_message(message_type, serialised_message, fourbyteas=None):
-    return PARSERS[message_type](serialised_message, fourbyteas)
+class BgpMessageParser(object):
+    def __init__(self):
+        self.capabilities = {}
+
+    def parse(self, message_type, serialised_message):
+        return PARSERS[message_type](serialised_message, self.capabilities)
 
 def register_parser(cls):
     PARSERS[cls.MSG_TYPE] = cls.parse
@@ -163,7 +167,7 @@ class BgpOpenMessage(BgpMessage):
         self.capabilities = capabilities
 
     @classmethod
-    def parse(cls, serialised_message, _fourbyteas):
+    def parse(cls, serialised_message, _capabilities):
         version, peer_as, hold_time, identifier, optional_parameters_length = struct.unpack(
             "!BHH4sB",
             serialised_message[:10]
@@ -512,7 +516,7 @@ class BgpUpdateMessage(BgpMessage):
         self.nlri = nlri
 
     @classmethod
-    def parse(cls, serialised_message, fourbyteas):
+    def parse(cls, serialised_message, capabilities):
         data_stream = BytesIO(serialised_message)
         withdrawn_routes_length = bytes_to_short(data_stream.read(2))
         serialised_withdrawn_routes = data_stream.read(withdrawn_routes_length)
@@ -520,7 +524,7 @@ class BgpUpdateMessage(BgpMessage):
 
         total_path_attribute_length = bytes_to_short(data_stream.read(2))
         serialised_path_attributes = data_stream.read(total_path_attribute_length)
-        path_attributes = parse_path_attributes(serialised_path_attributes, fourbyteas)
+        path_attributes = parse_path_attributes(serialised_path_attributes, "fourbyteas" in capabilities)
 
         serialised_nlri = data_stream.read()
         nlri = parse_nlri(serialised_nlri)
@@ -602,7 +606,7 @@ class BgpNotificationMessage(BgpMessage):
         self.data = data
 
     @classmethod
-    def parse(cls, serialised_message, _fourbyteas):
+    def parse(cls, serialised_message, _capabilities):
         error_code, error_subcode = struct.unpack("!BB", serialised_message[:2])
         data = serialised_message[2:]
         return cls(error_code, error_subcode, data)
@@ -629,7 +633,7 @@ class BgpKeepaliveMessage(BgpMessage):
         pass
 
     @classmethod
-    def parse(cls, serialised_message, _fourbyteas):
+    def parse(cls, serialised_message, _capabilities):
         return cls()
 
     def pack(self):

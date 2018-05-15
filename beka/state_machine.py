@@ -14,7 +14,7 @@ class StateMachine:
     DEFAULT_KEEPALIVE_TIME = DEFAULT_HOLD_TIME // 3
 
     def __init__(self, local_as, peer_as, router_id, local_address, neighbor,
-                 hold_time=DEFAULT_HOLD_TIME):
+                 hold_time=DEFAULT_HOLD_TIME, open_handler=None):
         self.local_as = local_as
         if local_as > 65535:
             self.local_as2 = 23456
@@ -25,6 +25,7 @@ class StateMachine:
         self.local_address = IPAddress.from_string(local_address)
         self.neighbor = IPAddress.from_string(neighbor)
         self.hold_time = hold_time
+        self.open_handler = open_handler
 
         self.keepalive_time = hold_time // 3
         self.output_messages = Queue()
@@ -87,6 +88,9 @@ class StateMachine:
             if "fourbyteas" in message.capabilities:
                 self.fourbyteas = message.capabilities["fourbyteas"]
 
+            if self.open_handler:
+                self.open_handler(message.capabilities)
+
             capabilities = {
                 "fourbyteas": [self.local_as]
             }
@@ -96,7 +100,6 @@ class StateMachine:
                 capabilities.update(ipv4_capabilities)
             elif isinstance(self.local_address, IP6Address):
                 capabilities.update(ipv6_capabilities)
-
             open_message = BgpOpenMessage(4, self.local_as2, self.hold_time, self.router_id, capabilities)
             keepalive_message = BgpKeepaliveMessage()
             self.output_messages.put(open_message)
