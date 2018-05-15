@@ -21,9 +21,18 @@ class BgpMessage(object):
             "!16sHB",
             cls.MARKER,
             length,
-            message.type
+            message.MSG_TYPE
             )
         return header + packed_message
+
+PARSERS = {}
+
+def parse_bgp_message(message_type, serialised_message, fourbyteas=None):
+    return PARSERS[message_type](serialised_message, fourbyteas)
+
+def register_parser(cls):
+    PARSERS[cls.MSG_TYPE] = cls.parse
+    return cls
 
 MULTIPROTOCOL_TYPES = {
     (1, 1): "ipv4-unicast",
@@ -142,13 +151,15 @@ def parse_optional_parameters(serialised_optional_parameters):
 
     return capabilities
 
+@register_parser
 class BgpOpenMessage(BgpMessage):
+    MSG_TYPE = BgpMessage.OPEN_MESSAGE
+
     def __init__(self, version, peer_as, hold_time, identifier, capabilities):
         self.version = version
         self.peer_as = peer_as
         self.hold_time = hold_time
         self.identifier = identifier
-        self.type = self.OPEN_MESSAGE
         self.capabilities = capabilities
 
     @classmethod
@@ -491,9 +502,11 @@ PATH_ATTRIBUTE_ORDER = {
     "mp_unreach_nlri" : 6,
 }
 
+@register_parser
 class BgpUpdateMessage(BgpMessage):
+    MSG_TYPE = BgpMessage.UPDATE_MESSAGE
+
     def __init__(self, withdrawn_routes, path_attributes, nlri):
-        self.type = self.UPDATE_MESSAGE
         self.withdrawn_routes = withdrawn_routes
         self.path_attributes = path_attributes
         self.nlri = nlri
@@ -572,7 +585,10 @@ class BgpUpdateMessage(BgpMessage):
             [str(x) for x in self.nlri]
             )
 
+@register_parser
 class BgpNotificationMessage(BgpMessage):
+    MSG_TYPE = BgpMessage.NOTIFICATION_MESSAGE
+
     MESSAGE_HEADER_ERROR = 1
     OPEN_MESSAGE_ERROR = 2
     UPDATE_MESSAGE_ERROR = 3
@@ -581,7 +597,6 @@ class BgpNotificationMessage(BgpMessage):
     CEASE = 6
 
     def __init__(self, error_code, error_subcode=0, data=b""):
-        self.type = self.NOTIFICATION_MESSAGE
         self.error_code = error_code
         self.error_subcode = error_subcode
         self.data = data
@@ -606,9 +621,12 @@ class BgpNotificationMessage(BgpMessage):
             self.data
             )
 
+@register_parser
 class BgpKeepaliveMessage(BgpMessage):
+    MSG_TYPE = BgpMessage.KEEPALIVE_MESSAGE
+
     def __init__(self):
-        self.type = self.KEEPALIVE_MESSAGE
+        pass
 
     @classmethod
     def parse(cls, serialised_message, _fourbyteas):
@@ -622,13 +640,3 @@ class BgpKeepaliveMessage(BgpMessage):
 
     def __str__(self):
         return "BgpKeepaliveMessage"
-
-PARSERS = {
-    BgpMessage.OPEN_MESSAGE: BgpOpenMessage,
-    BgpMessage.UPDATE_MESSAGE: BgpUpdateMessage,
-    BgpMessage.NOTIFICATION_MESSAGE: BgpNotificationMessage,
-    BgpMessage.KEEPALIVE_MESSAGE: BgpKeepaliveMessage,
-}
-
-def parse_bgp_message(message_type, serialised_message, fourbyteas=None):
-    return PARSERS[message_type].parse(serialised_message, fourbyteas)

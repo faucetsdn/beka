@@ -82,7 +82,7 @@ class StateMachine:
             self.handle_message_established_state(message, tick)
 
     def handle_message_active_state(self, message, tick):
-        if message.type == BgpMessage.OPEN_MESSAGE:
+        if isinstance(message, BgpOpenMessage):
             # TODO sanity check incoming open message
             if "fourbyteas" in message.capabilities:
                 self.fourbyteas = message.capabilities["fourbyteas"]
@@ -105,34 +105,34 @@ class StateMachine:
             self.timers["keepalive"] = tick
             self.state = "open_confirm"
         else:
-            self.shutdown("Invalid message in Active state: %d" % message.type)
+            self.shutdown("Invalid message in Active state: %s" % str(message))
 
     def handle_message_open_confirm_state(self, message, tick):
-        if message.type == BgpMessage.KEEPALIVE_MESSAGE:
+        if isinstance(message, BgpKeepaliveMessage):
             for message in self.build_update_messages():
                 self.output_messages.put(message)
             self.timers["hold"] = tick
             self.state = "established"
-        elif message.type == BgpMessage.NOTIFICATION_MESSAGE:
+        elif isinstance(message, BgpNotificationMessage):
             self.shutdown("Notification message received %s" % str(message))
-        elif message.type == BgpMessage.OPEN_MESSAGE:
+        elif isinstance(message, BgpOpenMessage):
             notification_message = BgpNotificationMessage(BgpNotificationMessage.CEASE)
             self.output_messages.put(notification_message)
             self.shutdown("Received Open message in OpenConfirm state")
-        elif message.type == BgpMessage.UPDATE_MESSAGE:
+        elif isinstance(message, BgpUpdateMessage):
             notification_message = BgpNotificationMessage(
                 BgpNotificationMessage.FINITE_STATE_MACHINE_ERROR)
             self.output_messages.put(notification_message)
             self.shutdown("Received Update message in OpenConfirm state")
 
     def handle_message_established_state(self, message, tick):
-        if message.type == BgpMessage.UPDATE_MESSAGE:
+        if isinstance(message, BgpUpdateMessage):
             self.process_route_update(message)
-        elif message.type == BgpMessage.KEEPALIVE_MESSAGE:
+        elif isinstance(message, BgpKeepaliveMessage):
             self.timers["hold"] = tick
-        elif message.type == BgpMessage.NOTIFICATION_MESSAGE:
+        elif isinstance(message, BgpNotificationMessage):
             self.shutdown("Notification message received %s" % str(message))
-        elif message.type == BgpMessage.OPEN_MESSAGE:
+        elif isinstance(message, BgpOpenMessage):
             notification_message = BgpNotificationMessage(BgpNotificationMessage.CEASE)
             self.output_messages.put(notification_message)
             self.shutdown("Received Open message in Established state")

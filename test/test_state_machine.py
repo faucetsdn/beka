@@ -44,8 +44,8 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
         self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "open_confirm")
         self.assertEqual(self.state_machine.output_messages.qsize(), 2)
-        self.assertEqual(self.state_machine.output_messages.get().type, BgpMessage.OPEN_MESSAGE)
-        self.assertEqual(self.state_machine.output_messages.get().type, BgpMessage.KEEPALIVE_MESSAGE)
+        self.assertTrue(isinstance(self.state_machine.output_messages.get(), BgpOpenMessage))
+        self.assertTrue(isinstance(self.state_machine.output_messages.get(), BgpKeepaliveMessage))
         self.assertEqual(self.state_machine.timers["hold"], self.tick)
         self.assertEqual(self.state_machine.timers["keepalive"], self.tick)
 
@@ -91,7 +91,6 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
-        self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 6) # Cease
 
     def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
@@ -102,7 +101,6 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
-        self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 4) # Hold Timer Expired
 
     def test_keepalive_timer_expired_event_sends_keepalive_and_resets_keepalive_timer(self):
@@ -111,7 +109,7 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "open_confirm")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
-        self.assertEqual(message.type, BgpMessage.KEEPALIVE_MESSAGE)
+        self.assertTrue(isinstance(message, BgpKeepaliveMessage))
         self.assertEqual(self.state_machine.timers["keepalive"], self.tick)
 
     def test_notification_message_advances_to_idle(self):
@@ -156,8 +154,8 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.output_messages.qsize(), 2)
         first_update = self.state_machine.output_messages.get()
         second_update = self.state_machine.output_messages.get()
-        self.assertEqual(first_update.type, BgpMessage.UPDATE_MESSAGE)
-        self.assertEqual(second_update.type, BgpMessage.UPDATE_MESSAGE)
+        self.assertTrue(isinstance(first_update, BgpUpdateMessage))
+        self.assertTrue(isinstance(second_update, BgpUpdateMessage))
         self.assertEqual(first_update.path_attributes["next_hop"], IP4Address.from_string("192.168.1.33"))
         self.assertEqual(first_update.nlri, [
             IP4Prefix.from_string("10.0.0.0/8"),
@@ -197,8 +195,8 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.output_messages.qsize(), 2)
         first_update = self.state_machine.output_messages.get()
         second_update = self.state_machine.output_messages.get()
-        self.assertEqual(first_update.type, BgpMessage.UPDATE_MESSAGE)
-        self.assertEqual(second_update.type, BgpMessage.UPDATE_MESSAGE)
+        self.assertTrue(isinstance(first_update, BgpUpdateMessage))
+        self.assertTrue(isinstance(second_update, BgpUpdateMessage))
         self.assertEqual(first_update.path_attributes["mp_reach_nlri"]["next_hop"], [IP6Address.from_string("2001:db1::1")])
         self.assertEqual(first_update.path_attributes["mp_reach_nlri"]["nlri"], [
             IP6Prefix.from_string("2001:db4::/127"),
@@ -216,7 +214,6 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
-        self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 6) # Cease
 
     def test_update_message_advances_to_idle(self):
@@ -231,7 +228,6 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
-        self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 5) # FSM error
 
 class StateMachineEstablishedTestCase(unittest.TestCase):
@@ -254,7 +250,7 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "established")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
-        self.assertEqual(message.type, BgpMessage.KEEPALIVE_MESSAGE)
+        self.assertTrue(isinstance(message, BgpKeepaliveMessage))
         self.assertEqual(self.state_machine.timers["keepalive"], self.tick)
 
     def test_update_message_adds_route(self):
@@ -315,7 +311,6 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
-        self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 6) # Cease
 
     def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
@@ -326,7 +321,6 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
-        self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 4) # Hold Timer Expired
 
     def test_notification_message_advances_to_idle(self):
@@ -342,5 +336,4 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "idle")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
-        self.assertEqual(message.type, BgpMessage.NOTIFICATION_MESSAGE)
         self.assertEqual(message.error_code, 6) # Cease
