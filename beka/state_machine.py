@@ -58,10 +58,11 @@ class StateMachine:
         raise IdleError("State machine stopping: %s" % message)
 
     def handle_timers(self, tick):
-        if self.state == "open_confirm" or self.state == "established":
+        if self.state == "open_sent" or self.state == "open_confirm" or self.state == "established":
             if self.timers["hold"] + self.hold_time <= tick:
                 self.handle_hold_timer()
-            elif self.timers["keepalive"] + self.keepalive_time <= tick:
+        if self.state == "open_confirm" or self.state == "established":
+            if self.timers["keepalive"] + self.keepalive_time <= tick:
                 self.handle_keepalive_timer(tick)
 
     def handle_hold_timer(self):
@@ -77,6 +78,8 @@ class StateMachine:
     def handle_message(self, message, tick):# state machine
         if self.state == "active":
             self.handle_message_active_state(message, tick)
+        elif self.state == "open_sent":
+            self.handle_message_open_sent_state(message, tick)
         elif self.state == "open_confirm":
             self.handle_message_open_confirm_state(message, tick)
         elif self.state == "established":
@@ -109,6 +112,32 @@ class StateMachine:
             self.state = "open_confirm"
         else:
             self.shutdown("Invalid message in Active state: %s" % str(message))
+
+    def handle_message_open_sent_state(self, message, tick):
+        if isinstance(message, BgpOpenMessage):
+            # TODO sanity check incoming open message
+            if "fourbyteas" in message.capabilities:
+                self.fourbyteas = message.capabilities["fourbyteas"]
+
+            if self.open_handler:
+                self.open_handler(message.capabilities)
+
+            capabilities = {
+                "fourbyteas": [self.local_as]
+            }
+            ipv4_capabilities = {"multiprotocol": ["ipv4-unicast"]}
+            ipv6_capabilities = {"multiprotocol": ["ipv6-unicast"]}
+            if isinstance(self.local_address, IP4Address):
+                capabilities.update(ipv4_capabilities)
+            elif isinstance(self.local_address, IP6Address):
+                capabilities.update(ipv6_capabilities)
+            keepalive_message = BgpKeepaliveMessage()
+            self.output_messages.put(keepalive_message)
+            self.timers["hold"] = tick
+            self.timers["keepalive"] = tick
+            self.state = "open_confirm"
+        else:
+            self.shutdown("Invalid message in OpenSent state: %s" % str(message))
 
     def handle_message_open_confirm_state(self, message, tick):
         if isinstance(message, BgpKeepaliveMessage):

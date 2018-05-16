@@ -76,6 +76,76 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
             self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
 
+class StateMachineOpenSentTestCase(unittest.TestCase):
+    def setUp(self):
+        self.tick = 10000
+        self.open_handler = MagicMock()
+        self.state_machine = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240, open_handler=self.open_handler)
+        self.old_hold_timer = self.state_machine.timers["hold"]
+        self.old_keepalive_timer = self.state_machine.timers["keepalive"]
+        self.assertEqual(self.state_machine.state, "active")
+        # TODO trigger this correctly
+        self.state_machine.state = "open_sent"
+        self.state_machine.timers["hold"] = self.tick
+        self.assertEqual(self.state_machine.output_messages.qsize(), 0)
+
+    def test_shutdown_message_advances_to_idle(self):
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventShutdown(), self.tick)
+        self.assertEqual(self.state_machine.state, "idle")
+        self.assertTrue("Shutdown requested" in str(context.exception))
+
+    def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
+        self.state_machine.timers["hold"] = self.tick - 3600
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventTimerExpired(), self.tick)
+        self.assertEqual(self.state_machine.state, "idle")
+        self.assertEqual(self.state_machine.output_messages.qsize(), 1)
+        message = self.state_machine.output_messages.get()
+        self.assertEqual(message.error_code, 4) # Hold Timer Expired
+
+    def test_keepalive_timer_expired_event_does_nothing(self):
+        self.state_machine.timers["keepalive"] = self.tick - 3600
+        self.state_machine.event(EventTimerExpired(), self.tick)
+        self.assertEqual(self.state_machine.state, "open_sent")
+        self.assertEqual(self.tick, self.state_machine.timers["hold"])
+        self.assertEqual(self.state_machine.output_messages.qsize(), 0)
+        self.assertEqual(self.state_machine.route_updates.qsize(), 0)
+
+    def test_open_message_advances_to_open_confirm_and_sets_timers(self):
+        capabilities = {"multiprotocol": "ipv4-unicast"}
+        message = BgpOpenMessage(4, 65002, 240, IP4Address.from_string("2.2.2.2"), capabilities)
+        self.state_machine.event(EventMessageReceived(message), self.tick)
+        self.assertEqual(self.state_machine.state, "open_confirm")
+        self.assertEqual(self.state_machine.output_messages.qsize(), 1)
+        self.open_handler.assert_called_with(capabilities)
+        self.assertTrue(isinstance(self.state_machine.output_messages.get(), BgpKeepaliveMessage))
+        self.assertEqual(self.state_machine.timers["hold"], self.tick)
+        self.assertEqual(self.state_machine.timers["keepalive"], self.tick)
+
+    def test_keepalive_message_advances_to_idle(self):
+        message = BgpKeepaliveMessage()
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
+        self.assertEqual(self.state_machine.state, "idle")
+
+    def test_notification_message_advances_to_idle(self):
+        message = BgpNotificationMessage(0, 0, b"")
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
+        self.assertEqual(self.state_machine.state, "idle")
+
+    def test_update_message_advances_to_idle(self):
+        path_attributes = {
+            "next_hop" : IP4Address.from_string("5.4.3.2"),
+            "as_path" : "65032 65011 65002",
+            "origin" : "EGP"
+            }
+        message = BgpUpdateMessage([], path_attributes, [IP4Prefix.from_string("192.168.0.0/16")])
+        with self.assertRaises(IdleError) as context:
+            self.state_machine.event(EventMessageReceived(message), self.tick)
+        self.assertEqual(self.state_machine.state, "idle")
+
 class StateMachineOpenConfirmTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
@@ -98,7 +168,6 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(message.error_code, 6) # Cease
 
     def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
-        self.tick = self.old_hold_timer
         self.state_machine.timers["hold"] = self.tick - 3600
         with self.assertRaises(IdleError) as context:
             self.state_machine.event(EventTimerExpired(), self.tick)
@@ -318,7 +387,6 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
         self.assertEqual(message.error_code, 6) # Cease
 
     def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
-        self.tick = self.old_hold_timer
         self.state_machine.timers["hold"] = self.tick - 3600
         with self.assertRaises(IdleError) as context:
             self.state_machine.event(EventTimerExpired(), self.tick)
