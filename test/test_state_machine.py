@@ -16,15 +16,19 @@ def build_byte_string(hex_stream):
     values = [int(x, 16) for x in map(''.join, zip(*[iter(hex_stream)]*2))]
     return struct.pack("!" + "B" * len(values), *values)
 
+def reset_timer_if_running(timer, tick):
+    if timer.running():
+        timer.reset(tick)
+
 class StateMachinePassiveActiveTestCase(unittest.TestCase):
     def setUp(self):
         self.tick = 10000
         self.open_handler = MagicMock()
         self.state_machine = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240, open_handler=self.open_handler)
-        self.old_hold_timer = self.state_machine.timers["hold"]
-        self.old_keepalive_timer = self.state_machine.timers["keepalive"]
         self.assertEqual(self.state_machine.state, "active")
         self.assertEqual(self.state_machine.output_messages.qsize(), 0)
+        self.assertFalse(self.state_machine.timers["hold"].running())
+        self.assertFalse(self.state_machine.timers["keepalive"].running())
 
     def test_shutdown_message_advances_to_idle(self):
         with self.assertRaises(IdleError) as context:
@@ -36,8 +40,8 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
         self.tick += 3600
         self.state_machine.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.state_machine.state, "active")
-        self.assertEqual(self.old_hold_timer, self.state_machine.timers["hold"])
-        self.assertEqual(self.old_keepalive_timer, self.state_machine.timers["keepalive"])
+        self.assertFalse(self.state_machine.timers["hold"].expired(self.tick))
+        self.assertFalse(self.state_machine.timers["keepalive"].expired(self.tick))
         self.assertEqual(self.state_machine.output_messages.qsize(), 0)
         self.assertEqual(self.state_machine.route_updates.qsize(), 0)
 
@@ -50,8 +54,8 @@ class StateMachinePassiveActiveTestCase(unittest.TestCase):
         self.open_handler.assert_called_with(capabilities)
         self.assertTrue(isinstance(self.state_machine.output_messages.get(), BgpOpenMessage))
         self.assertTrue(isinstance(self.state_machine.output_messages.get(), BgpKeepaliveMessage))
-        self.assertEqual(self.state_machine.timers["hold"], self.tick)
-        self.assertEqual(self.state_machine.timers["keepalive"], self.tick)
+        self.assertTrue(self.state_machine.timers["hold"].running())
+        self.assertTrue(self.state_machine.timers["keepalive"].running())
 
     def test_keepalive_message_advances_to_idle(self):
         message = BgpKeepaliveMessage()
@@ -81,13 +85,13 @@ class StateMachineOpenSentTestCase(unittest.TestCase):
         self.tick = 10000
         self.open_handler = MagicMock()
         self.state_machine = StateMachine(local_as=65001, peer_as=65002, local_address="1.1.1.1", router_id="1.1.1.1", neighbor="2.2.2.2", hold_time=240, open_handler=self.open_handler)
-        self.old_hold_timer = self.state_machine.timers["hold"]
-        self.old_keepalive_timer = self.state_machine.timers["keepalive"]
         self.assertEqual(self.state_machine.state, "active")
         # TODO trigger this correctly
         self.state_machine.state = "open_sent"
-        self.state_machine.timers["hold"] = self.tick
+        self.state_machine.timers["hold"].reset(self.tick)
         self.assertEqual(self.state_machine.output_messages.qsize(), 0)
+        self.assertFalse(self.state_machine.timers["keepalive"].running())
+        self.assertTrue(self.state_machine.timers["hold"].running())
 
     def test_shutdown_message_advances_to_idle(self):
         with self.assertRaises(IdleError) as context:
@@ -96,7 +100,7 @@ class StateMachineOpenSentTestCase(unittest.TestCase):
         self.assertTrue("Shutdown requested" in str(context.exception))
 
     def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
-        self.state_machine.timers["hold"] = self.tick - 3600
+        reset_timer_if_running(self.state_machine.timers["hold"], self.tick - 3600)
         with self.assertRaises(IdleError) as context:
             self.state_machine.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
@@ -105,10 +109,9 @@ class StateMachineOpenSentTestCase(unittest.TestCase):
         self.assertEqual(message.error_code, 4) # Hold Timer Expired
 
     def test_keepalive_timer_expired_event_does_nothing(self):
-        self.state_machine.timers["keepalive"] = self.tick - 3600
+        reset_timer_if_running(self.state_machine.timers["keepalive"], self.tick - 3600)
         self.state_machine.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.state_machine.state, "open_sent")
-        self.assertEqual(self.tick, self.state_machine.timers["hold"])
         self.assertEqual(self.state_machine.output_messages.qsize(), 0)
         self.assertEqual(self.state_machine.route_updates.qsize(), 0)
 
@@ -120,8 +123,8 @@ class StateMachineOpenSentTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         self.open_handler.assert_called_with(capabilities)
         self.assertTrue(isinstance(self.state_machine.output_messages.get(), BgpKeepaliveMessage))
-        self.assertEqual(self.state_machine.timers["hold"], self.tick)
-        self.assertEqual(self.state_machine.timers["keepalive"], self.tick)
+        self.assertTrue(self.state_machine.timers["hold"].running())
+        self.assertTrue(self.state_machine.timers["keepalive"].running())
 
     def test_keepalive_message_advances_to_idle(self):
         message = BgpKeepaliveMessage()
@@ -155,8 +158,8 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(self.state_machine.state, "open_confirm")
         for _ in range(self.state_machine.output_messages.qsize()):
             self.state_machine.output_messages.get()
-        self.old_hold_timer = self.state_machine.timers["hold"]
-        self.old_keepalive_timer = self.state_machine.timers["keepalive"]
+        self.assertTrue(self.state_machine.timers["keepalive"].running())
+        self.assertTrue(self.state_machine.timers["hold"].running())
 
     def test_shutdown_message_advances_to_idle_and_sends_notification(self):
         with self.assertRaises(IdleError) as context:
@@ -168,7 +171,7 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(message.error_code, 6) # Cease
 
     def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
-        self.state_machine.timers["hold"] = self.tick - 3600
+        reset_timer_if_running(self.state_machine.timers["hold"], self.tick - 3600)
         with self.assertRaises(IdleError) as context:
             self.state_machine.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.state_machine.state, "idle")
@@ -177,13 +180,14 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         self.assertEqual(message.error_code, 4) # Hold Timer Expired
 
     def test_keepalive_timer_expired_event_sends_keepalive_and_resets_keepalive_timer(self):
-        self.state_machine.timers["keepalive"] = self.tick - 3600
+        reset_timer_if_running(self.state_machine.timers["keepalive"], self.tick - 3600)
         self.state_machine.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.state_machine.state, "open_confirm")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
         self.assertTrue(isinstance(message, BgpKeepaliveMessage))
-        self.assertEqual(self.state_machine.timers["keepalive"], self.tick)
+        self.assertFalse(self.state_machine.timers["keepalive"].expired(self.tick))
+        self.assertTrue(self.state_machine.timers["keepalive"].running())
 
     def test_notification_message_advances_to_idle(self):
         message = BgpNotificationMessage(0, 0, b"")
@@ -196,7 +200,8 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         message = BgpKeepaliveMessage()
         self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "established")
-        self.assertEqual(self.state_machine.timers["hold"], self.tick)
+        self.assertTrue(self.state_machine.timers["hold"].running())
+        self.assertFalse(self.state_machine.timers["hold"].expired(self.tick))
 
     def test_keepalive_message_sends_all_routes(self):
         self.tick += 3600
@@ -223,7 +228,8 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         message = BgpKeepaliveMessage()
         self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "established")
-        self.assertEqual(self.state_machine.timers["hold"], self.tick)
+        self.assertTrue(self.state_machine.timers["hold"].running())
+        self.assertFalse(self.state_machine.timers["hold"].expired(self.tick))
         self.assertEqual(self.state_machine.output_messages.qsize(), 2)
         first_update = self.state_machine.output_messages.get()
         second_update = self.state_machine.output_messages.get()
@@ -264,7 +270,8 @@ class StateMachineOpenConfirmTestCase(unittest.TestCase):
         message = BgpKeepaliveMessage()
         self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "established")
-        self.assertEqual(self.state_machine.timers["hold"], self.tick)
+        self.assertTrue(self.state_machine.timers["hold"].running())
+        self.assertFalse(self.state_machine.timers["hold"].expired(self.tick))
         self.assertEqual(self.state_machine.output_messages.qsize(), 2)
         first_update = self.state_machine.output_messages.get()
         second_update = self.state_machine.output_messages.get()
@@ -314,17 +321,18 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
         message = BgpKeepaliveMessage()
         self.state_machine.event(EventMessageReceived(message), self.tick)
         self.assertEqual(self.state_machine.state, "established")
-        self.old_hold_timer = self.state_machine.timers["hold"]
-        self.old_keepalive_timer = self.state_machine.timers["keepalive"]
+        self.assertTrue(self.state_machine.timers["hold"].running())
+        self.assertTrue(self.state_machine.timers["keepalive"].running())
 
     def test_keepalive_timer_expired_event_sends_keepalive_and_resets_keepalive_timer(self):
-        self.state_machine.timers["keepalive"] = self.tick - 3600
+        reset_timer_if_running(self.state_machine.timers["keepalive"], self.tick - 3600)
         self.state_machine.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.state_machine.state, "established")
         self.assertEqual(self.state_machine.output_messages.qsize(), 1)
         message = self.state_machine.output_messages.get()
         self.assertTrue(isinstance(message, BgpKeepaliveMessage))
-        self.assertEqual(self.state_machine.timers["keepalive"], self.tick)
+        self.assertTrue(self.state_machine.timers["keepalive"].running())
+        self.assertFalse(self.state_machine.timers["keepalive"].expired(self.tick))
 
     def test_update_message_adds_route(self):
         path_attributes = {
@@ -387,7 +395,7 @@ class StateMachineEstablishedTestCase(unittest.TestCase):
         self.assertEqual(message.error_code, 6) # Cease
 
     def test_hold_timer_expired_event_advances_to_idle_and_sends_notification(self):
-        self.state_machine.timers["hold"] = self.tick - 3600
+        reset_timer_if_running(self.state_machine.timers["hold"], self.tick - 3600)
         with self.assertRaises(IdleError) as context:
             self.state_machine.event(EventTimerExpired(), self.tick)
         self.assertEqual(self.state_machine.state, "idle")

@@ -7,6 +7,7 @@ from .route import RouteAddition, RouteRemoval
 from .ip import IPAddress, IPPrefix
 from .ip import IP4Address, IP4Prefix
 from .ip import IP6Address, IP6Prefix
+from .timer import Timer
 from .error import IdleError
 
 class StateMachine:
@@ -34,8 +35,8 @@ class StateMachine:
         self.fourbyteas = False
 
         self.timers = {
-            "hold": None,
-            "keepalive": None,
+            "hold": Timer(self.hold_time),
+            "keepalive": Timer(self.keepalive_time),
         }
         self.state = "active"
 
@@ -58,12 +59,10 @@ class StateMachine:
         raise IdleError("State machine stopping: %s" % message)
 
     def handle_timers(self, tick):
-        if self.state == "open_sent" or self.state == "open_confirm" or self.state == "established":
-            if self.timers["hold"] + self.hold_time <= tick:
-                self.handle_hold_timer()
-        if self.state == "open_confirm" or self.state == "established":
-            if self.timers["keepalive"] + self.keepalive_time <= tick:
-                self.handle_keepalive_timer(tick)
+        if self.timers["hold"].expired(tick):
+            self.handle_hold_timer()
+        if self.timers["keepalive"].expired(tick):
+            self.handle_keepalive_timer(tick)
 
     def handle_hold_timer(self):
         notification_message = BgpNotificationMessage(BgpNotificationMessage.HOLD_TIMER_EXPIRED)
@@ -71,7 +70,7 @@ class StateMachine:
         self.shutdown("Hold timer expired")
 
     def handle_keepalive_timer(self, tick):
-        self.timers["keepalive"] = tick
+        self.timers["keepalive"].reset(tick)
         message = BgpKeepaliveMessage()
         self.output_messages.put(message)
 
@@ -107,8 +106,8 @@ class StateMachine:
             keepalive_message = BgpKeepaliveMessage()
             self.output_messages.put(open_message)
             self.output_messages.put(keepalive_message)
-            self.timers["hold"] = tick
-            self.timers["keepalive"] = tick
+            self.timers["hold"].reset(tick)
+            self.timers["keepalive"].reset(tick)
             self.state = "open_confirm"
         else:
             self.shutdown("Invalid message in Active state: %s" % str(message))
@@ -133,8 +132,8 @@ class StateMachine:
                 capabilities.update(ipv6_capabilities)
             keepalive_message = BgpKeepaliveMessage()
             self.output_messages.put(keepalive_message)
-            self.timers["hold"] = tick
-            self.timers["keepalive"] = tick
+            self.timers["hold"].reset(tick)
+            self.timers["keepalive"].reset(tick)
             self.state = "open_confirm"
         else:
             self.shutdown("Invalid message in OpenSent state: %s" % str(message))
@@ -143,7 +142,8 @@ class StateMachine:
         if isinstance(message, BgpKeepaliveMessage):
             for message in self.build_update_messages():
                 self.output_messages.put(message)
-            self.timers["hold"] = tick
+            self.timers["hold"].reset(tick)
+            self.timers["keepalive"].reset(tick)
             self.state = "established"
         elif isinstance(message, BgpNotificationMessage):
             self.shutdown("Notification message received %s" % str(message))
@@ -161,7 +161,7 @@ class StateMachine:
         if isinstance(message, BgpUpdateMessage):
             self.process_route_update(message)
         elif isinstance(message, BgpKeepaliveMessage):
-            self.timers["hold"] = tick
+            self.timers["hold"].reset(tick)
         elif isinstance(message, BgpNotificationMessage):
             self.shutdown("Notification message received %s" % str(message))
         elif isinstance(message, BgpOpenMessage):
