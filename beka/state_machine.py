@@ -1,4 +1,5 @@
 from eventlet.queue import Queue
+from collections import OrderedDict
 
 from .event import Event
 from .bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage
@@ -212,19 +213,14 @@ class StateMachine:
 
     def build_ipv4_update_messages(self, ipv4_route_additions):
         update_messages = []
-        nlri_by_path = {}
+        nlri_by_path = OrderedDict()
         for route_addition in ipv4_route_additions:
-            path_attributes = {
-                "next_hop": route_addition.next_hop,
-                "as_path": route_addition.as_path,
-                "origin": route_addition.origin
-            }
-            path_key = tuple(path_attributes.items())
-
-            if path_key not in nlri_by_path:
-                nlri_by_path[path_key] = []
-
-            nlri_by_path[path_key].append(route_addition.prefix)
+            path_key = (
+                ("next_hop", route_addition.next_hop),
+                ("as_path", route_addition.as_path),
+                ("origin", route_addition.origin)
+            )
+            nlri_by_path.setdefault(path_key, []).append(route_addition.prefix)
 
         for path_attributes, nlri in nlri_by_path.items():
             update_messages.append(BgpUpdateMessage([], dict(path_attributes), nlri))
@@ -233,19 +229,14 @@ class StateMachine:
 
     def build_ipv6_update_messages(self, ipv6_route_additions):
         update_messages = []
-        nlri_by_path = {}
+        nlri_by_path = OrderedDict()
         for route_addition in ipv6_route_additions:
-            path_attributes = {
-                "next_hop": route_addition.next_hop,
-                "as_path": route_addition.as_path,
-                "origin": route_addition.origin
-            }
-            path_key = tuple(path_attributes.items())
-
-            if path_key not in nlri_by_path:
-                nlri_by_path[path_key] = []
-
-            nlri_by_path[path_key].append(route_addition.prefix)
+            path_key = (
+                ("next_hop", route_addition.next_hop),
+                ("as_path", route_addition.as_path),
+                ("origin", route_addition.origin)
+            )
+            nlri_by_path.setdefault(path_key, []).append(route_addition.prefix)
 
         for path_attributes, nlri in nlri_by_path.items():
             path_attributes_dict = dict(path_attributes)

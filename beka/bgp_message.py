@@ -130,7 +130,7 @@ def pack_capabilities(capabilities):
             packed_header = struct.pack("!BB", capability_code, len(packed_body))
             packed_capability_list.append(packed_header + packed_body)
 
-    packed_capabilities = b"".join(packed_capability_list)
+    packed_capabilities = b"".join(sorted(packed_capability_list))
     return packed_capabilities
 
 def merge_dict_of_lists(main_dict, new_dict):
