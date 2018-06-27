@@ -467,10 +467,24 @@ def parse_path_attributes(serialised_path_attributes, fourbyteas):
     path_attributes = {}
 
     while True:
-        attribute_header = stream.read(3)
+        attribute_header = stream.read(2)
+
         if len(attribute_header) == 0:
             break
-        flags, type_code, length = struct.unpack("!BBB", attribute_header)
+        flags, type_code = struct.unpack("!BB", attribute_header)
+
+        # TODO factor this pattern out
+        if flags & 0x10:
+            packed_length = stream.read(2)
+            if len(packed_length) == 0:
+                break
+            length, = struct.unpack("!H", packed_length)
+        else:
+            packed_length = stream.read(1)
+            if len(packed_length) == 0:
+                break
+            length, = struct.unpack("!B", packed_length)
+
         packed_attribute = stream.read(length)
 
         if type_code in attribute_parsers:
