@@ -1,0 +1,14 @@
+beka for Debian
+------------------
+
+Beka is a fairly basic BGP speaker. It can send and receive unicast route
+updates in IPv4 and IPv6, but not too much else. It is designed to be simple to
+use and to extend, without too much overhead.
+
+It uses eventlet for concurrency, but is easy enough to port to gevent if that
+takes your fancy.
+
+More information at https://github.com/faucetsdn/beka
+
+ -- Brad Cowie <brad@faucet.nz>  Fri, 25 May 2018 11:22:41 +1300
+

@@ -1,0 +1,24 @@
+Source: beka
+Section: python
+Priority: optional
+Maintainer: Brad Cowie <brad@faucet.nz>
+Build-Depends: debhelper (>=9),
+               dh-python,
+               python3-all,
+               python3-setuptools,
+               python3-eventlet
+Standards-Version: 3.9.6
+Homepage: https://pypi.org/project/beka/
+X-Python3-Version: >= 3.2
+#Vcs-Git: git://github.com/faucetsdn/beka.git
+#Vcs-Browser: https://github.com/faucetsdn/beka.git
+
+Package: python3-beka
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}
+Description: Beka is a fairly basic BGP speaker. (Python 3)
+ It can send and receive unicast route updates in IPv4 and IPv6,
+ but not too much else. It is designed to be simple to use and to
+ extend, without too much overhead.
+ .
+ This package installs the library for Python 3.
