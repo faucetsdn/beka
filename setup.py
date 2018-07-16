@@ -9,7 +9,7 @@ long_description = """
     It uses eventlet for concurrency, but is easy enough to port to
     gevent if that takes your fancy.
 
-    More information at https://github.com/samrussell/beka
+    More information at https://github.com/faucetsdn/beka
 """
 
 setup(
@@ -17,7 +17,7 @@ setup(
     description='A bare-bones BGP speaker',
     long_description=long_description,
     version='0.3.3',
-    url='https://github.com/samrussell/beka',
+    url='https://github.com/faucetsdn/beka',
     author='Sam Russell',
     author_email='sam.h.russell@gmail.com',
     license='Apache2',
