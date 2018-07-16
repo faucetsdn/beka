@@ -18,3 +18,11 @@ script:
   - ./run_tests.sh
 after_script:
   - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
+deploy:
+  provider: pypi
+  user: faucet
+  password:
+    secure: WzvFx8DXe7mjYlCWyHeUmyhdO5sFrjc064piVrviuxegTnLNhTRyQ9/UnfedBGeMdYwvSlHamh6dLooh40KvcNI706HBHmV/qCsq0x4ZCwtWSBzhhAJgxP741JdXwucwSMG4HDMXN+OBQLnX8Q2vF3zPg3dYGGzzvDZrJH0wdACvTLPnja+jlBna2tEa5X5xl4JLDImhe8N0E9EJYYvvPWModJ41IfSaQIetmdjiUDbZgNdjaY6wypVS9MIoKpMARxpUCKdDry4KVWaPqRybJGrTpM/mWbwr5LDVSer2LTIFqUtRdG4phahEbcco0IbJ7o1CoRldLrwSTHDQ9/m8vKvAThSWs6FYMT09PMSd6Ar+huN0mx6iK7pl/c9xoF9FsIax6D2WW3TID31GpC4th4l86ctGtb1PLuorOVZAVxqiGa/DXlicZFyep0Vb/5vbpd8OlgXYIXOLDoo3pkNxBgY6EhHUVG8wgzB6f2dew/wNsplGYd6ONudNeDW+Sesu8eSHZhsdbYepYwDqHDQTGaTHwm2bkETtmBK+rhj5vspcNMCSjriBmouqRViA4DkPyRu6R9Q/Tb6b0NehpnUFP5PdEzJIC+0buZ+Cv17kVgRcWOaklUhul8ZOO6Jux6NXAa7E/Ag7vO6/jG6v1HiEjLqNwhrc33/O4rJEQB0CrzM=
+  on:
+    repo: faucetsdn/beka
+    tags: true
