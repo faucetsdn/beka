@@ -97,3 +97,6 @@ class Beka(object):
             self.stream_server.stop()
         for peering in self.peerings:
             peering.shutdown()
+
+    def listening_on(self, address, port):
+        return self.local_address == address and self.bgp_port == port
