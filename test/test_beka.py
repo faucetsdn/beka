@@ -48,3 +48,20 @@ class BekaTestCase(unittest.TestCase):
             )
         )
 
+    def test_listening_on(self):
+        beka = Beka(
+            local_address='1.2.3.4',
+            bgp_port=12345,
+            local_as=23456,
+            router_id='4.3.2.1',
+            peer_up_handler=None,
+            peer_down_handler=None,
+            route_handler=None,
+            error_handler=None
+        )
+        self.assertTrue(beka.listening_on('1.2.3.4', 12345))
+        self.assertFalse(beka.listening_on('1.2.3.4', 23456))
+        self.assertFalse(beka.listening_on('4.3.2.1', 12345))
+        self.assertFalse(beka.listening_on('4.3.2.1', 23456))
+        self.assertFalse(beka.listening_on('8.8.8.8', 53))
+
