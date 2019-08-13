@@ -1,2 +1,2 @@
-eventlet
+eventlet==0.24.1
 pbr>=1.9
