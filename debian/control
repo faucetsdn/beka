@@ -6,6 +6,7 @@ Build-Depends: debhelper (>=9),
                dh-python,
                python3-all,
                python3-setuptools,
+               python3-pbr (>=1.9),
                python3-eventlet
 Standards-Version: 3.9.6
 Homepage: https://pypi.org/project/beka/
