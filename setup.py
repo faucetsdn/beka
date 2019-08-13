@@ -1,36 +1,17 @@
+import sys
+
 from setuptools import setup
 
-long_description = """
-    Beka is a fairly basic BGP speaker. It can send
-    and receive unicast route updates in IPv4 and IPv6,
-    but not too much else. It is designed to be simple to use
-    and to extend, without too much overhead.
+if sys.version_info < (3,):
+    print("""You are trying to install beka on python {py}
 
-    It uses eventlet for concurrency, but is easy enough to port to
-    gevent if that takes your fancy.
-
-    More information at https://github.com/faucetsdn/beka
-"""
+beka is not compatible with python 2, please upgrade to python 3.5 or newer."""
+          .format(py='.'.join([str(v) for v in sys.version_info[:3]])), file=sys.stderr)
+    sys.exit(1)
 
 setup(
     name='beka',
-    description='A bare-bones BGP speaker',
-    long_description=long_description,
-    version='0.3.3',
-    url='https://github.com/faucetsdn/beka',
-    author='Sam Russell',
-    author_email='sam.h.russell@gmail.com',
-    license='Apache2',
-    classifiers=[
-        'Development Status :: 4 - Beta',
-        'Intended Audience :: System Administrators',
-        'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 3'
-    ],
-    keywords='bgp beka routing sdn networking',
-    packages=['beka'],
-    python_requires='>=3',
-    install_requires=[
-        'eventlet'
-    ]
+    setup_requires=['pbr>=1.9', 'setuptools>=17.1'],
+    python_requires='>=3.5',
+    pbr=True
 )
