@@ -11,7 +11,12 @@ from .error import SocketClosedError, IdleError
 import time
 
 class Peering(object):
+
     def __init__(self, state_machine, peer_address, socket, route_handler, error_handler=None):
+        self.chopper = None
+        self.eventlets = None
+        self.parser = None
+        self.packer = None
         self.state_machine = state_machine
         self.peer_address = peer_address[0]
         self.peer_port = peer_address[1]
