@@ -1,2 +1,5 @@
+codecov
+pylint
+pytest
 pytest-cov
-coverage
+pytype==2019.8.9

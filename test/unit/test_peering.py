@@ -63,4 +63,4 @@ class PeeringTestCase(unittest.TestCase):
             call(self.peering.kick_timers),
             call(self.peering.receive_messages),
         ])
-        GreenPool().waitall.assert_called_once()
+        assert GreenPool().waitall.call_count == 1
