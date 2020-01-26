@@ -8,8 +8,6 @@ stages:
     if: repo = faucetsdn/beka AND tag IS present
 script:
   - ./travis/runtests.sh
-matrix:
-  include:
 jobs:
   include:
     - stage: test
