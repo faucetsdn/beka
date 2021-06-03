@@ -46,7 +46,7 @@ if [ "$CODE_CHECK" == 1 ] ; then
 
     echo "=============== Running PyType ===================="
     time PYTHONPATH=${BEKA_ROOT} pytype --config ${BEKA_ROOT}/setup.cfg \
-        ${BEKA_ROOT}/beka/*py
+        ${BEKA_ROOT}/beka/
 
     echo "=============== Running Pylint ===================="
     time ${BEKA_ROOT}/test/codecheck/pylint.sh
