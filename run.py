@@ -1,16 +1,18 @@
+import signal
 import sys
 import yaml
-import signal
 
 from eventlet import GreenPool
 
 from beka.beka import Beka
 
+
 def printmsg(msg):
     sys.stderr.write("%s\n" % msg)
     sys.stderr.flush()
 
-class Server(object):
+
+class Server():
     def __init__(self):
         self.peering_hosts = []
         self.greenlets = []
@@ -60,20 +62,21 @@ class Server(object):
             printmsg("Shutting down Beka %s" % beka)
             beka.shutdown()
 
-    def peer_up_handler(self, peer_ip, peer_as):
+    def peer_up_handler(self, peer_ip, peer_as):  # pylint: disable=no-self-use
         printmsg("[Peer up] %s %d" % (peer_ip, peer_as))
 
-    def peer_down_handler(self, peer_ip, peer_as):
+    def peer_down_handler(self, peer_ip, peer_as):  # pylint: disable=no-self-use
         printmsg("[Peer down] %s %s" % (peer_ip, peer_as))
 
-    def error_handler(self, msg):
+    def error_handler(self, msg):  # pylint: disable=no-self-use
         printmsg("[Error] %s" % msg)
 
-    def route_handler(self, route_update):
+    def route_handler(self, route_update):  # pylint: disable=no-self-use
         if route_update.is_withdraw:
             printmsg("[Route handler] Route removed: %s" % route_update)
         else:
             printmsg("[Route handler] New route received: %s" % route_update)
+
 
 if __name__ == "__main__":
     server = Server()

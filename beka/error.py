@@ -1,7 +1,7 @@
+"""Exception classes for beka"""
+
 class SocketClosedError(Exception):
-    def __init__(self, msg):
-        super(SocketClosedError, self).__init__(msg)
+    """Exception raised when socket closed error occurs"""
 
 class IdleError(Exception):
-    def __init__(self, msg):
-        super(IdleError, self).__init__(msg)
+    """Exception raised when idle error occurs"""

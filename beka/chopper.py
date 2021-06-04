@@ -18,7 +18,9 @@ class Chopper(object):
         if extra_data_length > 0:
             serialised_body = self.input_stream.read(extra_data_length)
             if len(serialised_body) < extra_data_length:
-                raise SocketClosedError("Tried to read %d bytes but only got %d" % (extra_data_length, len(header)))
+                raise SocketClosedError(
+                    "Tried to read %d bytes but only got %d" % (extra_data_length, len(header))
+                )
         elif extra_data_length < 0:
             raise ValueError("Invalid BGP length field")
         else:
@@ -36,5 +38,5 @@ class Chopper(object):
 
         if marker == BgpMessage.MARKER:
             return header, length, message_type
-        else:
-            raise ValueError("BGP marker missing")
+
+        raise ValueError("BGP marker missing")
