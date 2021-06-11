@@ -43,6 +43,11 @@ fi
 
 # ============================= Code Checks =============================
 if [ "$CODE_CHECK" == 1 ] ; then
+    if [ "$PIP_INSTALL" == 1 ] ; then
+        echo "=============== Installing Pypi Dependencies ================="
+        pip3 install --upgrade --cache-dir=/var/tmp/pip-cache \
+            -r "${BEKA_ROOT}/codecheck-requirements.txt"
+    fi
 
     echo "=============== Running PyType ===================="
     time PYTHONPATH=${BEKA_ROOT} pytype --config ${BEKA_ROOT}/setup.cfg \
