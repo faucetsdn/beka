@@ -4,12 +4,12 @@ from .stream_server import StreamServer
 
 from .state_machine import StateMachine
 from .peering import Peering
-from .route import RouteAddition, RouteRemoval
+from .route import RouteAddition
 from .ip import IPAddress, IPPrefix
 
 DEFAULT_BGP_PORT = 179
 
-class Beka(object):
+class Beka:
     def __init__(self, local_address, bgp_port, local_as,
             router_id, peer_up_handler, peer_down_handler,
             route_handler, error_handler):

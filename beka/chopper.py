@@ -2,7 +2,7 @@ import struct
 from .error import SocketClosedError
 from .bgp_message import BgpMessage
 
-class Chopper(object):
+class Chopper:
     def __init__(self, input_stream):
         self.input_stream = input_stream
 
@@ -36,5 +36,4 @@ class Chopper(object):
 
         if marker == BgpMessage.MARKER:
             return header, length, message_type
-        else:
-            raise ValueError("BGP marker missing")
+        raise ValueError("BGP marker missing")

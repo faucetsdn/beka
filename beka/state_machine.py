@@ -1,11 +1,11 @@
-from eventlet.queue import Queue
 from collections import OrderedDict
+from eventlet.queue import Queue
 
 from .event import Event
-from .bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage
+from .bgp_message import BgpOpenMessage, BgpUpdateMessage
 from .bgp_message import BgpKeepaliveMessage, BgpNotificationMessage
 from .route import RouteAddition, RouteRemoval
-from .ip import IPAddress, IPPrefix
+from .ip import IPAddress
 from .ip import IP4Address, IP4Prefix
 from .ip import IP6Address, IP6Prefix
 from .timer import Timer
@@ -211,7 +211,8 @@ class StateMachine:
         return self.build_ipv4_update_messages(ipv4_route_additions) + \
             self.build_ipv6_update_messages(ipv6_route_additions)
 
-    def build_ipv4_update_messages(self, ipv4_route_additions):
+    @staticmethod
+    def build_ipv4_update_messages(ipv4_route_additions):
         update_messages = []
         nlri_by_path = OrderedDict()
         for route_addition in ipv4_route_additions:
@@ -227,7 +228,8 @@ class StateMachine:
 
         return update_messages
 
-    def build_ipv6_update_messages(self, ipv6_route_additions):
+    @staticmethod
+    def build_ipv6_update_messages(ipv6_route_additions):
         update_messages = []
         nlri_by_path = OrderedDict()
         for route_addition in ipv6_route_additions:

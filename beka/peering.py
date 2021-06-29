@@ -1,16 +1,13 @@
+import time
 from eventlet import sleep, GreenPool
-from eventlet.queue import Queue
-import eventlet.greenthread as greenthread
 
 from .chopper import Chopper
 from .event import EventTimerExpired, EventMessageReceived
-from .bgp_message import BgpMessage, BgpMessageParser, BgpMessagePacker
-from .route import RouteAddition, RouteRemoval
+from .bgp_message import BgpMessageParser, BgpMessagePacker
 from .error import SocketClosedError, IdleError
 
-import time
 
-class Peering(object):
+class Peering:
 
     def __init__(self, state_machine, peer_address, socket, route_handler, error_handler=None):
         self.chopper = None
@@ -24,6 +21,8 @@ class Peering(object):
         self.route_handler = route_handler
         self.error_handler = error_handler
         self.start_time = int(time.time())
+        self.input_stream = None
+        self.pool = None
 
     def uptime(self):
         return int(time.time()) - self.start_time

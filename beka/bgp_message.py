@@ -1,11 +1,10 @@
 import struct
-import socket
-from .packing_tools import bytes_to_short, bytes_to_integer
+from io import BytesIO
+from .packing_tools import bytes_to_short
 from .ip import IP4Prefix, IP4Address
 from .ip import IP6Prefix, IP6Address
-from io import BytesIO
 
-class BgpMessage(object):
+class BgpMessage:
     OPEN_MESSAGE = 1
     UPDATE_MESSAGE = 2
     NOTIFICATION_MESSAGE = 3
@@ -15,7 +14,7 @@ class BgpMessage(object):
 
 PARSERS = {}
 
-class BgpMessageParser(object):
+class BgpMessageParser:
     def __init__(self):
         self.capabilities = {}
 
@@ -26,7 +25,7 @@ def register_parser(cls):
     PARSERS[cls.MSG_TYPE] = cls.parse
     return cls
 
-class BgpMessagePacker(object):
+class BgpMessagePacker:
     def __init__(self):
         self.capabilities = {}
 
@@ -47,7 +46,7 @@ MULTIPROTOCOL_TYPES = {
 }
 
 def parse_multiprotocol(serialised_capability):
-    afi, reserved, safi = struct.unpack("!HBB", serialised_capability)
+    afi, _reserved, safi = struct.unpack("!HBB", serialised_capability)
     if (afi, safi) in MULTIPROTOCOL_TYPES:
         return MULTIPROTOCOL_TYPES[(afi, safi)]
     return (afi, safi)
@@ -653,7 +652,8 @@ class BgpKeepaliveMessage(BgpMessage):
     def parse(cls, serialised_message, _capabilities):
         return cls()
 
-    def pack(self, _capabilities):
+    @staticmethod
+    def pack(_capabilities):
         return b""
 
     def __eq__(self, other):

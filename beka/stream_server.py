@@ -1,7 +1,7 @@
+import socket
 from eventlet import GreenPool, listen
 import eventlet.greenthread as greenthread
 
-import socket
 
 class StreamServer:
     def __init__(self, address, handler):
@@ -21,15 +21,15 @@ class StreamServer:
 
         try:
             while self.running:
-                socket, address = self.server.accept()
-                greenlet = pool.spawn(self.call_handler, socket, address)
-                self.greenlets
+                server_socket, address = self.server.accept()
+                greenlet = pool.spawn(self.call_handler, server_socket, address)
+                self.greenlets.add(greenlet)
         except OSError:
             pass
 
-    def call_handler(self, socket, address):
+    def call_handler(self, server_socket, address):
         self.greenlets.add(greenthread.getcurrent())
-        self.handler(socket, address)
+        self.handler(server_socket, address)
         self.greenlets.remove(greenthread.getcurrent())
 
     def stop(self):

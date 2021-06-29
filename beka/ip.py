@@ -7,7 +7,7 @@ def is_ipv6(address_string):
 
     return ":" in address_string
 
-class IPBase(object): # pylint: disable=too-few-public-methods
+class IPBase: # pylint: disable=too-few-public-methods
     """Abstract base class for IP addresses and prefixes"""
 
     def __repr__(self):
