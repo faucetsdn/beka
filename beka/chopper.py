@@ -2,6 +2,7 @@ import struct
 from .error import SocketClosedError
 from .bgp_message import BgpMessage
 
+
 class Chopper:
     def __init__(self, input_stream):
         self.input_stream = input_stream

@@ -4,6 +4,7 @@ from .packing_tools import bytes_to_short
 from .ip import IP4Prefix, IP4Address
 from .ip import IP6Prefix, IP6Address
 
+
 class BgpMessage:
     OPEN_MESSAGE = 1
     UPDATE_MESSAGE = 2
@@ -13,6 +14,7 @@ class BgpMessage:
     HEADER_LENGTH = 19
 
 PARSERS = {}
+
 
 class BgpMessageParser:
     def __init__(self):
@@ -24,6 +26,7 @@ class BgpMessageParser:
 def register_parser(cls):
     PARSERS[cls.MSG_TYPE] = cls.parse
     return cls
+
 
 class BgpMessagePacker:
     def __init__(self):
