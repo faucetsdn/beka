@@ -1,33 +1,44 @@
 import unittest
-from unittest.mock import Mock, patch, call
+from unittest.mock import patch, call
 
 from eventlet import GreenPool, sleep
 from eventlet.queue import Queue
 
 from beka.peering import Peering
 
-class RouteCatcher(object):
+
+class RouteCatcher():  # pylint: disable=too-few-public-methods
     def __init__(self):
         self.route_updates = []
 
     def handle(self, route_update):
         self.route_updates.append(route_update)
 
-class FakeStateMachine(object):
+
+class FakeStateMachine():  # pylint: disable=too-few-public-methods
+    """Mocked StateMachine"""
+
     def __init__(self):
         self.output_messages = Queue()
         self.route_updates = Queue()
 
-class FakeSocket(object):
+
+class FakeSocket():  # pylint: disable=too-few-public-methods
+    """Mocked Socket"""
+
     def __init__(self):
         pass
 
-    def makefile(self, *args, **kwargs):
+    def makefile(self, *args, **kwargs):  # pylint: disable=unused-argument,no-self-use
         return None
 
-class FakeChopper(object):
+
+class FakeChopper():  # pylint: disable=too-few-public-methods
+    """Mocked Chopper"""
+
     def __init__(self):
         pass
+
 
 class PeeringTestCase(unittest.TestCase):
     def setUp(self):

@@ -1,8 +1,7 @@
 # Beka
 
-[![Build Status](https://travis-ci.com/faucetsdn/beka.svg?branch=master)](https://travis-ci.com/faucetsdn/beka)
-[![Maintainability](https://api.codeclimate.com/v1/badges/a97c1287222d20baa4eb/maintainability)](https://codeclimate.com/github/faucetsdn/beka/maintainability)
-[![Test Coverage](https://api.codeclimate.com/v1/badges/a97c1287222d20baa4eb/test_coverage)](https://codeclimate.com/github/faucetsdn/beka/test_coverage)
+[![Build Status](https://github.com/faucetsdn/beka/workflows/Unit%20tests/badge.svg?branch=master)](https://github.com/faucetsdn/beka/actions?query=workflow%3A%22Unit+tests%22)
+[![Test Coverage](https://codecov.io/gh/faucetsdn/beka/branch/master/graph/badge.svg)](https://codecov.io/gh/faucetsdn/beka)
 
 Beka is a fairly basic BGP speaker. It can send
 and receive unicast route updates in IPv4 and IPv6,

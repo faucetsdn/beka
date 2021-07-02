@@ -1,16 +1,14 @@
+import struct
+import unittest
+from unittest.mock import MagicMock
+
 from beka.bgp_message import BgpMessage, BgpOpenMessage, BgpUpdateMessage, BgpKeepaliveMessage, BgpNotificationMessage
 from beka.state_machine import StateMachine
-from beka.event import Event, EventTimerExpired, EventMessageReceived, EventShutdown
+from beka.event import EventTimerExpired, EventMessageReceived, EventShutdown
 from beka.ip import IP4Prefix, IP4Address
 from beka.ip import IP6Prefix, IP6Address
 from beka.route import RouteAddition, RouteRemoval
 from beka.error import IdleError
-
-import time
-import unittest
-from unittest.mock import MagicMock
-import socket
-import struct
 
 def build_byte_string(hex_stream):
     values = [int(x, 16) for x in map(''.join, zip(*[iter(hex_stream)]*2))]
