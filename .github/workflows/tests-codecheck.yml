@@ -6,8 +6,8 @@ env:
   CODECHECK_PY_VER: 3.8
 
 jobs:
-  codecheck:
-    name: Code check
+  pylint:
+    name: Pylint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -16,6 +16,29 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ env.CODECHECK_PY_VER }}
-      - name: Run code checks
+      - name: Install dependencies
         run: |
-          BEKA_TESTS=-nz ./run_tests.sh
+          pip3 install --upgrade -r "codecheck-requirements.txt"
+      - name: Run pylint
+        run: |
+          ./test/codecheck/pylint.sh
+
+  pytype:
+    name: Pytype
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Set up python-${{ env.CODECHECK_PY_VER }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.CODECHECK_PY_VER }}
+      - name: Install dependencies
+        run: |
+          pip3 install --upgrade -r "codecheck-requirements.txt"
+      - name: Run pytype
+        run: |
+          PYTHONPATH=. pytype --config setup.cfg beka
