@@ -80,9 +80,9 @@ def parse_capabilities(serialised_capabilities):
         if len(serialised_header) == 0:
             break
         capability_code, capability_length = struct.unpack("!BB", serialised_header)
+        serialised_capability = stream.read(capability_length)
         if capability_code in capability_keys:
             capability_key = capability_keys[capability_code]
-            serialised_capability = stream.read(capability_length)
             if capability_key not in capabilities:
                 capabilities[capability_key] = []
             capabilities[capability_key].append(capability_parsers[capability_code](serialised_capability))
