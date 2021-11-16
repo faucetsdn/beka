@@ -22,8 +22,8 @@ class Server():
         signal.signal(signal.SIGINT, self.signal_handler)
         pool = GreenPool()
 
-        with open("beka.yaml") as file:
-            config = yaml.load(file.read())
+        with open("beka.yaml", encoding='utf-8') as file:
+            config = yaml.safe_load(file.read())
         for router in config["routers"]:
             printmsg("Starting Beka on %s" % router["local_address"])
             beka = Beka(
