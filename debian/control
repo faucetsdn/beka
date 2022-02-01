@@ -2,12 +2,12 @@ Source: beka
 Section: python
 Priority: optional
 Maintainer: Brad Cowie <brad@faucet.nz>
-Build-Depends: debhelper (>=9),
+Build-Depends: debhelper (>= 11),
                dh-python,
                python3-all,
                python3-setuptools,
-               python3-pbr (>=1.9),
-               python3-eventlet
+               python3-eventlet,
+               python3-pbr (>= 1.9),
 Standards-Version: 3.9.6
 Homepage: https://pypi.org/project/beka/
 X-Python3-Version: >= 3.7
@@ -16,7 +16,9 @@ X-Python3-Version: >= 3.7
 
 Package: python3-beka
 Architecture: all
-Depends: ${python3:Depends}, ${misc:Depends}
+Depends: ${python3:Depends},
+         python3:any (>= 3.7~),
+         ${misc:Depends}
 Description: Beka is a fairly basic BGP speaker. (Python 3)
  It can send and receive unicast route updates in IPv4 and IPv6,
  but not too much else. It is designed to be simple to use and to
