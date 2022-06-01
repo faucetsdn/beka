@@ -29,7 +29,7 @@ class FakeSocket():  # pylint: disable=too-few-public-methods
     def __init__(self):
         pass
 
-    def makefile(self, *args, **kwargs):  # pylint: disable=unused-argument,no-self-use
+    def makefile(self, *args, **kwargs):  # pylint: disable=unused-argument
         return None
 
 

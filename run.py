@@ -62,16 +62,16 @@ class Server():
             printmsg("Shutting down Beka %s" % beka)
             beka.shutdown()
 
-    def peer_up_handler(self, peer_ip, peer_as):  # pylint: disable=no-self-use
+    def peer_up_handler(self, peer_ip, peer_as):
         printmsg("[Peer up] %s %d" % (peer_ip, peer_as))
 
-    def peer_down_handler(self, peer_ip, peer_as):  # pylint: disable=no-self-use
+    def peer_down_handler(self, peer_ip, peer_as):
         printmsg("[Peer down] %s %s" % (peer_ip, peer_as))
 
-    def error_handler(self, msg):  # pylint: disable=no-self-use
+    def error_handler(self, msg):
         printmsg("[Error] %s" % msg)
 
-    def route_handler(self, route_update):  # pylint: disable=no-self-use
+    def route_handler(self, route_update):
         if route_update.is_withdraw:
             printmsg("[Route handler] Route removed: %s" % route_update)
         else:
