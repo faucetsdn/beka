@@ -2,18 +2,21 @@
 
 import socket
 
+
 def is_ipv6(address_string):
     """Checks if a string is an IPv6 address or prefix"""
 
     return ":" in address_string
 
-class IPBase(object): # pylint: disable=too-few-public-methods
+
+class IPBase(object):  # pylint: disable=too-few-public-methods
     """Abstract base class for IP addresses and prefixes"""
 
     def __repr__(self):
-        return "%s.from_string(\"%s\")" % (self.__class__.__name__, self.__str__())
+        return '%s.from_string("%s")' % (self.__class__.__name__, self.__str__())
 
-class IPAddress(IPBase): # pylint: disable=too-few-public-methods
+
+class IPAddress(IPBase):  # pylint: disable=too-few-public-methods
     """Abstract base class for IP addresses"""
 
     INET_TYPE = None
@@ -48,7 +51,7 @@ class IPAddress(IPBase): # pylint: disable=too-few-public-methods
         return IP4Address.build_from_string(string)
 
 
-class IPPrefix(IPBase): # pylint: disable=too-few-public-methods
+class IPPrefix(IPBase):  # pylint: disable=too-few-public-methods
     """Abstract base class for IP prefixes"""
 
     INET_TYPE = None
@@ -79,7 +82,7 @@ class IPPrefix(IPBase): # pylint: disable=too-few-public-methods
         return IP4Prefix.build_from_string(string)
 
 
-class IP4Address(IPAddress): # pylint: disable=too-few-public-methods
+class IP4Address(IPAddress):  # pylint: disable=too-few-public-methods
     """An IPv4 address"""
 
     INET_TYPE = socket.AF_INET
@@ -92,7 +95,8 @@ class IP4Address(IPAddress): # pylint: disable=too-few-public-methods
 
         return cls(address)
 
-class IP4Prefix(IPPrefix): # pylint: disable=too-few-public-methods
+
+class IP4Prefix(IPPrefix):  # pylint: disable=too-few-public-methods
     """An IPv4 prefix"""
 
     INET_TYPE = socket.AF_INET
@@ -106,7 +110,8 @@ class IP4Prefix(IPPrefix): # pylint: disable=too-few-public-methods
 
         return cls(prefix, int(length_string, 10))
 
-class IP6Address(IPAddress): # pylint: disable=too-few-public-methods
+
+class IP6Address(IPAddress):  # pylint: disable=too-few-public-methods
     """An IPv6 address"""
 
     INET_TYPE = socket.AF_INET6
@@ -119,7 +124,8 @@ class IP6Address(IPAddress): # pylint: disable=too-few-public-methods
 
         return cls(address)
 
-class IP6Prefix(IPPrefix): # pylint: disable=too-few-public-methods
+
+class IP6Prefix(IPPrefix):  # pylint: disable=too-few-public-methods
     """An IPv6 prefix"""
 
     INET_TYPE = socket.AF_INET6

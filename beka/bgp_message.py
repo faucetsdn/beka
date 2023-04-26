@@ -5,6 +5,7 @@ from .ip import IP4Prefix, IP4Address
 from .ip import IP6Prefix, IP6Address
 from io import BytesIO
 
+
 class BgpMessage(object):
     OPEN_MESSAGE = 1
     UPDATE_MESSAGE = 2
@@ -13,7 +14,9 @@ class BgpMessage(object):
     MARKER = b"\xFF" * 16
     HEADER_LENGTH = 19
 
+
 PARSERS = {}
+
 
 class BgpMessageParser(object):
     def __init__(self):
@@ -22,9 +25,11 @@ class BgpMessageParser(object):
     def parse(self, message_type, serialised_message):
         return PARSERS[message_type](serialised_message, self.capabilities)
 
+
 def register_parser(cls):
     PARSERS[cls.MSG_TYPE] = cls.parse
     return cls
+
 
 class BgpMessagePacker(object):
     def __init__(self):
@@ -33,18 +38,12 @@ class BgpMessagePacker(object):
     def pack(self, message):
         packed_message = message.pack(self.capabilities)
         length = BgpMessage.HEADER_LENGTH + len(packed_message)
-        header = struct.pack(
-            "!16sHB",
-            BgpMessage.MARKER,
-            length,
-            message.MSG_TYPE
-            )
+        header = struct.pack("!16sHB", BgpMessage.MARKER, length, message.MSG_TYPE)
         return header + packed_message
 
-MULTIPROTOCOL_TYPES = {
-    (1, 1): "ipv4-unicast",
-    (2, 1): "ipv6-unicast"
-}
+
+MULTIPROTOCOL_TYPES = {(1, 1): "ipv4-unicast", (2, 1): "ipv6-unicast"}
+
 
 def parse_multiprotocol(serialised_capability):
     afi, reserved, safi = struct.unpack("!HBB", serialised_capability)
@@ -52,17 +51,20 @@ def parse_multiprotocol(serialised_capability):
         return MULTIPROTOCOL_TYPES[(afi, safi)]
     return (afi, safi)
 
+
 def parse_routerefresh(serialised_capability):
     return True
 
+
 def parse_fourbyteas(serialised_capability):
-    peer_as, = struct.unpack("!I", serialised_capability)
+    (peer_as,) = struct.unpack("!I", serialised_capability)
     return peer_as
+
 
 capability_parsers = {
     1: parse_multiprotocol,
     2: parse_routerefresh,
-    65: parse_fourbyteas
+    65: parse_fourbyteas,
 }
 
 capability_keys = {
@@ -70,6 +72,7 @@ capability_keys = {
     2: "routerefresh",
     65: "fourbyteas",
 }
+
 
 def parse_capabilities(serialised_capabilities):
     stream = BytesIO(serialised_capabilities)
@@ -85,26 +88,33 @@ def parse_capabilities(serialised_capabilities):
             capability_key = capability_keys[capability_code]
             if capability_key not in capabilities:
                 capabilities[capability_key] = []
-            capabilities[capability_key].append(capability_parsers[capability_code](serialised_capability))
+            capabilities[capability_key].append(
+                capability_parsers[capability_code](serialised_capability)
+            )
         else:
             print("WARNING did not recognise capability code %d" % capability_code)
 
     return capabilities
+
 
 MULTIPROTOCOL_AFI_SAFI = {
     "ipv4-unicast": (1, 1),
     "ipv6-unicast": (2, 1),
 }
 
+
 def pack_multiprotocol(multiprotocol):
     afi, safi = MULTIPROTOCOL_AFI_SAFI[multiprotocol]
     return struct.pack("!HBB", afi, 0, safi)
 
+
 def pack_routerefresh(route_refresh):
     return b""
 
+
 def pack_fourbyteas(fourbyteas):
     return struct.pack("!I", fourbyteas)
+
 
 capability_packers = {
     "multiprotocol": pack_multiprotocol,
@@ -120,6 +130,7 @@ capability_numbers = {
 
 OPTIONAL_PARAMETER_CAPABILITY = 2
 
+
 def pack_capabilities(capabilities):
     packed_capability_list = []
 
@@ -133,12 +144,14 @@ def pack_capabilities(capabilities):
     packed_capabilities = b"".join(sorted(packed_capability_list))
     return packed_capabilities
 
+
 def merge_dict_of_lists(main_dict, new_dict):
     for key, new_list in new_dict.items():
         if key not in main_dict:
             main_dict[key] = new_list
         else:
             main_dict[key] += new_list
+
 
 def parse_optional_parameters(serialised_optional_parameters):
     stream = BytesIO(serialised_optional_parameters)
@@ -150,13 +163,16 @@ def parse_optional_parameters(serialised_optional_parameters):
             break
         parameter_type, parameter_length = struct.unpack("!BB", serialised_header)
         if parameter_type != OPTIONAL_PARAMETER_CAPABILITY:
-            raise ValueError("OPEN: Got unsupported optional parameter: %d" % parameter_type)
+            raise ValueError(
+                "OPEN: Got unsupported optional parameter: %d" % parameter_type
+            )
         serialised_capabilities = stream.read(parameter_length)
 
         next_capabilities = parse_capabilities(serialised_capabilities)
         merge_dict_of_lists(capabilities, next_capabilities)
 
     return capabilities
+
 
 @register_parser
 class BgpOpenMessage(BgpMessage):
@@ -171,38 +187,46 @@ class BgpOpenMessage(BgpMessage):
 
     @classmethod
     def parse(cls, serialised_message, _capabilities):
-        version, peer_as, hold_time, identifier, optional_parameters_length = struct.unpack(
-            "!BHH4sB",
-            serialised_message[:10]
+        (
+            version,
+            peer_as,
+            hold_time,
+            identifier,
+            optional_parameters_length,
+        ) = struct.unpack("!BHH4sB", serialised_message[:10])
+        capabilities = parse_optional_parameters(
+            serialised_message[10 : 10 + optional_parameters_length]
         )
-        capabilities = parse_optional_parameters(serialised_message[10:10+optional_parameters_length])
         return cls(version, peer_as, hold_time, IP4Address(identifier), capabilities)
 
     def pack(self, _capabilities):
         packed_capabilities = pack_capabilities(self.capabilities)
         capabilities_header = struct.pack(
-            "!BB",
-            OPTIONAL_PARAMETER_CAPABILITY,
-            len(packed_capabilities))
+            "!BB", OPTIONAL_PARAMETER_CAPABILITY, len(packed_capabilities)
+        )
 
-        return struct.pack(
-            "!BHH4sB",
-            self.version,
-            self.peer_as,
-            self.hold_time,
-            self.identifier.address,
-            len(capabilities_header + packed_capabilities)
-        ) + capabilities_header + packed_capabilities
+        return (
+            struct.pack(
+                "!BHH4sB",
+                self.version,
+                self.peer_as,
+                self.hold_time,
+                self.identifier.address,
+                len(capabilities_header + packed_capabilities),
+            )
+            + capabilities_header
+            + packed_capabilities
+        )
 
     def __str__(self):
-        return "BgpOpenMessage: Version %s, Peer AS: %s, Hold time: %s, Identifier: %s" % (
-            self.version,
-            self.peer_as,
-            self.hold_time,
-            self.identifier
-            )
+        return (
+            "BgpOpenMessage: Version %s, Peer AS: %s, Hold time: %s, Identifier: %s"
+            % (self.version, self.peer_as, self.hold_time, self.identifier)
+        )
+
 
 IP4_LENGTH = 4
+
 
 def prefix_byte_length(bit_length):
     byte_length = bit_length // 8
@@ -211,8 +235,10 @@ def prefix_byte_length(bit_length):
 
     return byte_length
 
+
 def pack_prefix(prefix, length):
-    return prefix[:prefix_byte_length(length)]
+    return prefix[: prefix_byte_length(length)]
+
 
 def unpack_prefix(prefix):
     num_extra_bytes = IP4_LENGTH - len(prefix)
@@ -221,6 +247,7 @@ def unpack_prefix(prefix):
         return prefix
 
     return prefix + b"\x00" * num_extra_bytes
+
 
 def parse_nlri(serialised_nlri):
     stream = BytesIO(serialised_nlri)
@@ -237,19 +264,19 @@ def parse_nlri(serialised_nlri):
 
     return prefixes
 
-ORIGIN_CODES = {
-    0: "IGP",
-    1: "EGP",
-    2: "INCOMPLETE"
-}
+
+ORIGIN_CODES = {0: "IGP", 1: "EGP", 2: "INCOMPLETE"}
+
 
 def parse_origin(packed_origin):
     return ORIGIN_CODES[ord(packed_origin)]
+
 
 AS_SET_CODE = 1
 AS_SEQUENCE_CODE = 2
 AS_NUMBER_LENGTH = 2
 AS4_NUMBER_LENGTH = 4
+
 
 def parse_as4_path(packed_as_path):
     # this does as_sets wrong, assumes everything is as_sequence
@@ -266,6 +293,7 @@ def parse_as4_path(packed_as_path):
         as_numbers += struct.unpack("!" + ("I" * count), packed_as_sequence)
     return " ".join(["%d" % x for x in as_numbers])
 
+
 def parse_as_path(packed_as_path):
     # this does as_sets wrong, assumes everything is as_sequence
     input_stream = BytesIO(packed_as_path)
@@ -281,13 +309,16 @@ def parse_as_path(packed_as_path):
         as_numbers += struct.unpack("!" + ("H" * count), packed_as_sequence)
     return " ".join(["%d" % x for x in as_numbers])
 
+
 def parse_next_hop(packed_next_hop):
     return IP4Address(packed_next_hop)
+
 
 IP6_AFI = 2
 UNICAST_SAFI = 1
 
 IP6_LENGTH = 16
+
 
 def unpack_prefix6(prefix):
     num_extra_bytes = IP6_LENGTH - len(prefix)
@@ -296,6 +327,7 @@ def unpack_prefix6(prefix):
         return prefix
 
     return prefix + b"\x00" * num_extra_bytes
+
 
 def parse_nlri6(stream):
     prefixes = []
@@ -311,6 +343,7 @@ def parse_nlri6(stream):
 
     return prefixes
 
+
 def parse_mp_reach_nlri(packed_mp_reach_nlri):
     attributes = {}
     stream = BytesIO(packed_mp_reach_nlri)
@@ -320,17 +353,22 @@ def parse_mp_reach_nlri(packed_mp_reach_nlri):
     if safi != UNICAST_SAFI:
         raise ValueError("MP_REACH_NLRI: Got unsupported SAFI: %d" % safi)
     if next_hop_length % IP6_LENGTH != 0:
-        raise ValueError("MP_REACH_NLRI: Got unsupported next hop length: %d" % next_hop_length)
+        raise ValueError(
+            "MP_REACH_NLRI: Got unsupported next hop length: %d" % next_hop_length
+        )
 
     attributes["next_hop"] = []
     for _ in range(next_hop_length // 16):
-        attributes["next_hop"].append(IP6Address(struct.unpack("!16s", stream.read(IP6_LENGTH))[0]))
+        attributes["next_hop"].append(
+            IP6Address(struct.unpack("!16s", stream.read(IP6_LENGTH))[0])
+        )
 
     _reserved_snpa = stream.read(1)
 
     attributes["nlri"] = parse_nlri6(stream)
 
     return attributes
+
 
 def parse_mp_unreach_nlri(packed_mp_reach_nlri):
     attributes = {}
@@ -344,6 +382,7 @@ def parse_mp_unreach_nlri(packed_mp_reach_nlri):
     attributes["withdrawn_routes"] = parse_nlri6(stream)
 
     return attributes
+
 
 attribute_parsers = {
     1: parse_origin,
@@ -363,14 +402,12 @@ attribute_keys = {
     17: "as4_path",
 }
 
-ORIGIN_NUMBERS = {
-    "IGP": 0,
-    "EGP": 1,
-    "INCOMPLETE": 2
-}
+ORIGIN_NUMBERS = {"IGP": 0, "EGP": 1, "INCOMPLETE": 2}
+
 
 def pack_origin(origin):
     return struct.pack("!B", ORIGIN_NUMBERS[origin])
+
 
 def pack_as4_path(as_path):
     if not as_path:
@@ -382,6 +419,7 @@ def pack_as4_path(as_path):
     body = struct.pack("!" + ("I" * count), *as_numbers)
     return header + body
 
+
 def pack_as_path(as_path):
     if not as_path:
         return b""
@@ -392,24 +430,26 @@ def pack_as_path(as_path):
     body = struct.pack("!" + ("H" * count), *as_numbers)
     return header + body
 
+
 def pack_next_hop(next_hop):
     return next_hop.address
+
 
 def pack_nlri6(nlri):
     packed_nlri = []
 
     for prefix in nlri:
-        packed_prefix = struct.pack("!B", prefix.length) + pack_prefix(prefix.prefix, prefix.length)
+        packed_prefix = struct.pack("!B", prefix.length) + pack_prefix(
+            prefix.prefix, prefix.length
+        )
         packed_nlri.append(packed_prefix)
 
     return b"".join(packed_nlri)
 
+
 def pack_mp_reach_nlri(mp_reach_nlri):
     packed_header = struct.pack(
-        "!HBB",
-        IP6_AFI,
-        UNICAST_SAFI,
-        IP6_LENGTH * len(mp_reach_nlri["next_hop"])
+        "!HBB", IP6_AFI, UNICAST_SAFI, IP6_LENGTH * len(mp_reach_nlri["next_hop"])
     )
     packed_next_hop_list = []
     for next_hop in mp_reach_nlri["next_hop"]:
@@ -420,47 +460,47 @@ def pack_mp_reach_nlri(mp_reach_nlri):
 
     return packed_header + packed_next_hops + packed_reserved + packed_nlri
 
+
 def pack_mp_unreach_nlri(mp_unreach_nlri):
-    packed_header = struct.pack(
-        "!HB",
-        IP6_AFI,
-        UNICAST_SAFI
-    )
+    packed_header = struct.pack("!HB", IP6_AFI, UNICAST_SAFI)
     packed_withdrawn_route_list = []
     for withdrawn_route in mp_unreach_nlri["withdrawn_routes"]:
-        packed_prefix = struct.pack("!B", withdrawn_route.length) + \
-            pack_prefix(withdrawn_route.prefix, withdrawn_route.length)
+        packed_prefix = struct.pack("!B", withdrawn_route.length) + pack_prefix(
+            withdrawn_route.prefix, withdrawn_route.length
+        )
         packed_withdrawn_route_list.append(packed_prefix)
     packed_withdrawn_routes = b"".join(packed_withdrawn_route_list)
 
     return packed_header + packed_withdrawn_routes
 
+
 attribute_packers = {
     "origin": pack_origin,
     "as_path": pack_as_path,
     "next_hop": pack_next_hop,
-    "mp_reach_nlri" : pack_mp_reach_nlri,
-    "mp_unreach_nlri" : pack_mp_unreach_nlri,
+    "mp_reach_nlri": pack_mp_reach_nlri,
+    "mp_unreach_nlri": pack_mp_unreach_nlri,
     "as4_path": pack_as4_path,
 }
 
 attribute_numbers = {
-    "origin" : 1,
-    "as_path" : 2,
-    "next_hop" : 3,
-    "mp_reach_nlri" : 14,
-    "mp_unreach_nlri" : 15,
-    "as4_path" : 17,
+    "origin": 1,
+    "as_path": 2,
+    "next_hop": 3,
+    "mp_reach_nlri": 14,
+    "mp_unreach_nlri": 15,
+    "as4_path": 17,
 }
 
 attribute_flags = {
-    "origin" : 0x40,
-    "as_path" : 0x40,
-    "next_hop" : 0x40,
-    "mp_reach_nlri" : 0x80,
-    "mp_unreach_nlri" : 0x80,
-    "as4_path" : 0xc0,
+    "origin": 0x40,
+    "as_path": 0x40,
+    "next_hop": 0x40,
+    "mp_reach_nlri": 0x80,
+    "mp_unreach_nlri": 0x80,
+    "as4_path": 0xC0,
 }
+
 
 def parse_path_attributes(serialised_path_attributes, fourbyteas):
     stream = BytesIO(serialised_path_attributes)
@@ -478,12 +518,12 @@ def parse_path_attributes(serialised_path_attributes, fourbyteas):
             packed_length = stream.read(2)
             if len(packed_length) == 0:
                 break
-            length, = struct.unpack("!H", packed_length)
+            (length,) = struct.unpack("!H", packed_length)
         else:
             packed_length = stream.read(1)
             if len(packed_length) == 0:
                 break
-            length, = struct.unpack("!B", packed_length)
+            (length,) = struct.unpack("!B", packed_length)
 
         packed_attribute = stream.read(length)
 
@@ -493,11 +533,14 @@ def parse_path_attributes(serialised_path_attributes, fourbyteas):
             if fourbyteas and attribute_keys[type_code] == "as_path":
                 path_attributes["as_path"] = parse_as4_path(packed_attribute)
             else:
-                path_attributes[attribute_keys[type_code]] = attribute_parsers[type_code](packed_attribute)
+                path_attributes[attribute_keys[type_code]] = attribute_parsers[
+                    type_code
+                ](packed_attribute)
         else:
             print("WARNING did not recognise BGP path attribute type %d" % type_code)
 
     return path_attributes
+
 
 def parse_withdrawn_routes(serialised_withdrawn_routes):
     stream = BytesIO(serialised_withdrawn_routes)
@@ -514,14 +557,16 @@ def parse_withdrawn_routes(serialised_withdrawn_routes):
 
     return prefixes
 
+
 PATH_ATTRIBUTE_ORDER = {
-    "origin" : 1,
-    "as_path" : 2,
-    "as4_path" : 3,
-    "next_hop" : 4,
-    "mp_reach_nlri" : 5,
-    "mp_unreach_nlri" : 6,
+    "origin": 1,
+    "as_path": 2,
+    "as4_path": 3,
+    "next_hop": 4,
+    "mp_reach_nlri": 5,
+    "mp_unreach_nlri": 6,
 }
+
 
 @register_parser
 class BgpUpdateMessage(BgpMessage):
@@ -541,7 +586,9 @@ class BgpUpdateMessage(BgpMessage):
 
         total_path_attribute_length = bytes_to_short(data_stream.read(2))
         serialised_path_attributes = data_stream.read(total_path_attribute_length)
-        path_attributes = parse_path_attributes(serialised_path_attributes, "fourbyteas" in capabilities)
+        path_attributes = parse_path_attributes(
+            serialised_path_attributes, "fourbyteas" in capabilities
+        )
 
         serialised_nlri = data_stream.read()
         nlri = parse_nlri(serialised_nlri)
@@ -555,26 +602,32 @@ class BgpUpdateMessage(BgpMessage):
         packed_path_attributes = self.pack_path_attributes("fourbyteas" in capabilities)
         packed_path_attributes_length = struct.pack("!H", len(packed_path_attributes))
         packed_nlri = self.pack_nlri()
-        return packed_withdrawn_routes_length + \
-            packed_withdrawn_routes + \
-            packed_path_attributes_length + \
-            packed_path_attributes + \
-            packed_nlri
+        return (
+            packed_withdrawn_routes_length
+            + packed_withdrawn_routes
+            + packed_path_attributes_length
+            + packed_path_attributes
+            + packed_nlri
+        )
 
     def pack_withdrawn_routes(self):
         packed_routes_list = []
 
         for prefix in self.withdrawn_routes:
-            packed_route = struct.pack("!B", prefix.length) + pack_prefix(prefix.prefix, prefix.length)
+            packed_route = struct.pack("!B", prefix.length) + pack_prefix(
+                prefix.prefix, prefix.length
+            )
             packed_routes_list.append(packed_route)
 
         return b"".join(packed_routes_list)
 
     def pack_path_attributes(self, fourbyteas):
         packed_path_attributes = []
-        sorted_attribute_pairs = sorted(self.path_attributes.items(), key=lambda x: PATH_ATTRIBUTE_ORDER[x[0]])
+        sorted_attribute_pairs = sorted(
+            self.path_attributes.items(), key=lambda x: PATH_ATTRIBUTE_ORDER[x[0]]
+        )
         for name, path_attribute in sorted_attribute_pairs:
-            if fourbyteas and name=="as_path":
+            if fourbyteas and name == "as_path":
                 packed_entry = pack_as4_path(path_attribute)
             else:
                 packed_entry = attribute_packers[name](path_attribute)
@@ -582,7 +635,7 @@ class BgpUpdateMessage(BgpMessage):
                 "!BBB",
                 attribute_flags[name],
                 attribute_numbers[name],
-                len(packed_entry)
+                len(packed_entry),
             )
             packed_path_attribute = packed_header + packed_entry
             packed_path_attributes.append(packed_path_attribute)
@@ -594,17 +647,23 @@ class BgpUpdateMessage(BgpMessage):
 
         for prefix in self.nlri:
             # TODO this feels like it should be on IP4Prefix
-            packed_prefix = struct.pack("!B", prefix.length) + pack_prefix(prefix.prefix, prefix.length)
+            packed_prefix = struct.pack("!B", prefix.length) + pack_prefix(
+                prefix.prefix, prefix.length
+            )
             packed_nlri.append(packed_prefix)
 
         return b"".join(packed_nlri)
 
     def __str__(self):
-        return "BgpUpdateMessage: Withdrawn routes: %s, Path attributes: %s, NLRI: %s" % (
-            [str(x) for x in self.withdrawn_routes],
-            self.path_attributes,
-            [str(x) for x in self.nlri]
+        return (
+            "BgpUpdateMessage: Withdrawn routes: %s, Path attributes: %s, NLRI: %s"
+            % (
+                [str(x) for x in self.withdrawn_routes],
+                self.path_attributes,
+                [str(x) for x in self.nlri],
             )
+        )
+
 
 @register_parser
 class BgpNotificationMessage(BgpMessage):
@@ -629,18 +688,22 @@ class BgpNotificationMessage(BgpMessage):
         return cls(error_code, error_subcode, data)
 
     def pack(self, _capabilities):
-        return struct.pack(
-            "!BB",
-            self.error_code,
-            self.error_subcode,
-        ) + self.data
+        return (
+            struct.pack(
+                "!BB",
+                self.error_code,
+                self.error_subcode,
+            )
+            + self.data
+        )
 
     def __str__(self):
         return "BgpNotificationMessage: Error code: %s, Error subcode: %s, Data: %s" % (
             self.error_code,
             self.error_subcode,
-            self.data
-            )
+            self.data,
+        )
+
 
 @register_parser
 class BgpKeepaliveMessage(BgpMessage):

@@ -12,7 +12,7 @@ def printmsg(msg):
     sys.stderr.flush()
 
 
-class Server():
+class Server:
     def __init__(self):
         self.peering_hosts = []
         self.greenlets = []
@@ -22,7 +22,7 @@ class Server():
         signal.signal(signal.SIGINT, self.signal_handler)
         pool = GreenPool()
 
-        with open("beka.yaml", encoding='utf-8') as file:
+        with open("beka.yaml", encoding="utf-8") as file:
             config = yaml.safe_load(file.read())
         for router in config["routers"]:
             printmsg("Starting Beka on %s" % router["local_address"])
@@ -34,7 +34,7 @@ class Server():
                 self.peer_up_handler,
                 self.peer_down_handler,
                 self.route_handler,
-                self.error_handler
+                self.error_handler,
             )
             for peer in router["peers"]:
                 beka.add_neighbor(
@@ -44,10 +44,7 @@ class Server():
                 )
             if "routes" in router:
                 for route in router["routes"]:
-                    beka.add_route(
-                        route["prefix"],
-                        route["next_hop"]
-                    )
+                    beka.add_route(route["prefix"], route["next_hop"])
             self.bekas.append(beka)
             pool.spawn_n(beka.run)
         pool.waitall()

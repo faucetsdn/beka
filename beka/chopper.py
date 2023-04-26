@@ -2,6 +2,7 @@ import struct
 from .error import SocketClosedError
 from .bgp_message import BgpMessage
 
+
 class Chopper(object):
     def __init__(self, input_stream):
         self.input_stream = input_stream
@@ -19,7 +20,8 @@ class Chopper(object):
             serialised_body = self.input_stream.read(extra_data_length)
             if len(serialised_body) < extra_data_length:
                 raise SocketClosedError(
-                    "Tried to read %d bytes but only got %d" % (extra_data_length, len(header))
+                    "Tried to read %d bytes but only got %d"
+                    % (extra_data_length, len(header))
                 )
         elif extra_data_length < 0:
             raise ValueError("Invalid BGP length field")
@@ -32,7 +34,9 @@ class Chopper(object):
         # TODO handle when stream runs out
         header = self.input_stream.read(19)
         if len(header) < 19:
-            raise SocketClosedError("Tried to read %d bytes but only got %d" % (19, len(header)))
+            raise SocketClosedError(
+                "Tried to read %d bytes but only got %d" % (19, len(header))
+            )
 
         marker, length, message_type = struct.unpack("!16sHB", header)
 

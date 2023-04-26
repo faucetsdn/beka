@@ -7,7 +7,7 @@ from eventlet.queue import Queue
 from beka.peering import Peering
 
 
-class RouteCatcher():  # pylint: disable=too-few-public-methods
+class RouteCatcher:  # pylint: disable=too-few-public-methods
     def __init__(self):
         self.route_updates = []
 
@@ -15,7 +15,7 @@ class RouteCatcher():  # pylint: disable=too-few-public-methods
         self.route_updates.append(route_update)
 
 
-class FakeStateMachine():  # pylint: disable=too-few-public-methods
+class FakeStateMachine:  # pylint: disable=too-few-public-methods
     """Mocked StateMachine"""
 
     def __init__(self):
@@ -23,7 +23,7 @@ class FakeStateMachine():  # pylint: disable=too-few-public-methods
         self.route_updates = Queue()
 
 
-class FakeSocket():  # pylint: disable=too-few-public-methods
+class FakeSocket:  # pylint: disable=too-few-public-methods
     """Mocked Socket"""
 
     def __init__(self):
@@ -33,7 +33,7 @@ class FakeSocket():  # pylint: disable=too-few-public-methods
         return None
 
 
-class FakeChopper():  # pylint: disable=too-few-public-methods
+class FakeChopper:  # pylint: disable=too-few-public-methods
     """Mocked Chopper"""
 
     def __init__(self):
@@ -48,7 +48,7 @@ class PeeringTestCase(unittest.TestCase):
             state_machine=self.state_machine,
             peer_address="1.2.3.4:179",
             socket=FakeSocket(),
-            route_handler=self.route_catcher.handle
+            route_handler=self.route_catcher.handle,
         )
         self.peering.chopper = FakeChopper()
 
@@ -68,10 +68,12 @@ class PeeringTestCase(unittest.TestCase):
     def test_run_starts_threads(self):
         with patch("beka.peering.GreenPool") as GreenPool:
             self.peering.run()
-        GreenPool().spawn.assert_has_calls([
-            call(self.peering.send_messages),
-            call(self.peering.print_route_updates),
-            call(self.peering.kick_timers),
-            call(self.peering.receive_messages),
-        ])
+        GreenPool().spawn.assert_has_calls(
+            [
+                call(self.peering.send_messages),
+                call(self.peering.print_route_updates),
+                call(self.peering.kick_timers),
+                call(self.peering.receive_messages),
+            ]
+        )
         assert GreenPool().waitall.call_count == 1
