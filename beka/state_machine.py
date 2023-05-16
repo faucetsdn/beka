@@ -11,12 +11,21 @@ from .ip import IP6Address, IP6Prefix
 from .timer import Timer
 from .error import IdleError
 
+
 class StateMachine:
     DEFAULT_HOLD_TIME = 240
     DEFAULT_KEEPALIVE_TIME = DEFAULT_HOLD_TIME // 3
 
-    def __init__(self, local_as, peer_as, router_id, local_address, neighbor,
-                 hold_time=DEFAULT_HOLD_TIME, open_handler=None):
+    def __init__(
+        self,
+        local_as,
+        peer_as,
+        router_id,
+        local_address,
+        neighbor,
+        hold_time=DEFAULT_HOLD_TIME,
+        open_handler=None,
+    ):
         self.local_as = local_as
         if local_as > 65535:
             self.local_as2 = 23456
@@ -66,7 +75,9 @@ class StateMachine:
             self.handle_keepalive_timer(tick)
 
     def handle_hold_timer(self):
-        notification_message = BgpNotificationMessage(BgpNotificationMessage.HOLD_TIMER_EXPIRED)
+        notification_message = BgpNotificationMessage(
+            BgpNotificationMessage.HOLD_TIMER_EXPIRED
+        )
         self.output_messages.put(notification_message)
         self.shutdown("Hold timer expired")
 
@@ -75,7 +86,7 @@ class StateMachine:
         message = BgpKeepaliveMessage()
         self.output_messages.put(message)
 
-    def handle_message(self, message, tick):# state machine
+    def handle_message(self, message, tick):  # state machine
         if self.state == "active":
             self.handle_message_active_state(message, tick)
         elif self.state == "open_sent":
@@ -94,16 +105,16 @@ class StateMachine:
             if self.open_handler:
                 self.open_handler(message.capabilities)
 
-            capabilities = {
-                "fourbyteas": [self.local_as]
-            }
+            capabilities = {"fourbyteas": [self.local_as]}
             ipv4_capabilities = {"multiprotocol": ["ipv4-unicast"]}
             ipv6_capabilities = {"multiprotocol": ["ipv6-unicast"]}
             if isinstance(self.local_address, IP4Address):
                 capabilities.update(ipv4_capabilities)
             elif isinstance(self.local_address, IP6Address):
                 capabilities.update(ipv6_capabilities)
-            open_message = BgpOpenMessage(4, self.local_as2, self.hold_time, self.router_id, capabilities)
+            open_message = BgpOpenMessage(
+                4, self.local_as2, self.hold_time, self.router_id, capabilities
+            )
             keepalive_message = BgpKeepaliveMessage()
             self.output_messages.put(open_message)
             self.output_messages.put(keepalive_message)
@@ -122,9 +133,7 @@ class StateMachine:
             if self.open_handler:
                 self.open_handler(message.capabilities)
 
-            capabilities = {
-                "fourbyteas": [self.local_as]
-            }
+            capabilities = {"fourbyteas": [self.local_as]}
             ipv4_capabilities = {"multiprotocol": ["ipv4-unicast"]}
             ipv6_capabilities = {"multiprotocol": ["ipv6-unicast"]}
             if isinstance(self.local_address, IP4Address):
@@ -154,7 +163,8 @@ class StateMachine:
             self.shutdown("Received Open message in OpenConfirm state")
         elif isinstance(message, BgpUpdateMessage):
             notification_message = BgpNotificationMessage(
-                BgpNotificationMessage.FINITE_STATE_MACHINE_ERROR)
+                BgpNotificationMessage.FINITE_STATE_MACHINE_ERROR
+            )
             self.output_messages.put(notification_message)
             self.shutdown("Received Update message in OpenConfirm state")
 
@@ -178,7 +188,7 @@ class StateMachine:
                 prefix,
                 update_message.path_attributes["next_hop"],
                 update_message.path_attributes["as_path"],
-                update_message.path_attributes["origin"]
+                update_message.path_attributes["origin"],
             )
             self.route_updates.put(route)
         if "mp_reach_nlri" in update_message.path_attributes:
@@ -187,29 +197,34 @@ class StateMachine:
                     prefix,
                     update_message.path_attributes["mp_reach_nlri"]["next_hop"][0],
                     update_message.path_attributes["as_path"],
-                    update_message.path_attributes["origin"]
+                    update_message.path_attributes["origin"],
                 )
                 self.route_updates.put(route)
         for withdrawal in update_message.withdrawn_routes:
-            route = RouteRemoval(
-                withdrawal
-            )
+            route = RouteRemoval(withdrawal)
             self.route_updates.put(route)
         if "mp_unreach_nlri" in update_message.path_attributes:
-            for withdrawal in update_message.path_attributes["mp_unreach_nlri"]["withdrawn_routes"]:
-                route = RouteRemoval(
-                    withdrawal
-                )
+            for withdrawal in update_message.path_attributes["mp_unreach_nlri"][
+                "withdrawn_routes"
+            ]:
+                route = RouteRemoval(withdrawal)
                 self.route_updates.put(route)
 
     def build_update_messages(self):
         # TODO handle withdrawals
-        route_additions = list(filter(lambda x: isinstance(x, RouteAddition), self.routes_to_advertise))
-        ipv4_route_additions = filter(lambda x: isinstance(x.prefix, IP4Prefix), route_additions)
-        ipv6_route_additions = filter(lambda x: isinstance(x.prefix, IP6Prefix), route_additions)
+        route_additions = list(
+            filter(lambda x: isinstance(x, RouteAddition), self.routes_to_advertise)
+        )
+        ipv4_route_additions = filter(
+            lambda x: isinstance(x.prefix, IP4Prefix), route_additions
+        )
+        ipv6_route_additions = filter(
+            lambda x: isinstance(x.prefix, IP6Prefix), route_additions
+        )
 
-        return self.build_ipv4_update_messages(ipv4_route_additions) + \
-            self.build_ipv6_update_messages(ipv6_route_additions)
+        return self.build_ipv4_update_messages(
+            ipv4_route_additions
+        ) + self.build_ipv6_update_messages(ipv6_route_additions)
 
     def build_ipv4_update_messages(self, ipv4_route_additions):
         update_messages = []
@@ -218,7 +233,7 @@ class StateMachine:
             path_key = (
                 ("next_hop", route_addition.next_hop),
                 ("as_path", route_addition.as_path),
-                ("origin", route_addition.origin)
+                ("origin", route_addition.origin),
             )
             nlri_by_path.setdefault(path_key, []).append(route_addition.prefix)
 
@@ -234,7 +249,7 @@ class StateMachine:
             path_key = (
                 ("next_hop", route_addition.next_hop),
                 ("as_path", route_addition.as_path),
-                ("origin", route_addition.origin)
+                ("origin", route_addition.origin),
             )
             nlri_by_path.setdefault(path_key, []).append(route_addition.prefix)
 
@@ -247,8 +262,8 @@ class StateMachine:
                     "next_hop": [
                         path_attributes_dict["next_hop"],
                     ],
-                    "nlri": nlri
-                }
+                    "nlri": nlri,
+                },
             }
             update_messages.append(BgpUpdateMessage([], path_attributes_v6, []))
 

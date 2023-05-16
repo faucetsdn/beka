@@ -1,4 +1,4 @@
-class Event():  # pylint: disable=too-few-public-methods
+class Event:  # pylint: disable=too-few-public-methods
     TIMER_EXPIRED = 1
     MESSAGE_RECEIVED = 2
     SHUTDOWN = 3
