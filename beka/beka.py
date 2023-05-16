@@ -9,10 +9,19 @@ from .ip import IPAddress, IPPrefix
 
 DEFAULT_BGP_PORT = 179
 
+
 class Beka(object):
-    def __init__(self, local_address, bgp_port, local_as,
-            router_id, peer_up_handler, peer_down_handler,
-            route_handler, error_handler):
+    def __init__(
+        self,
+        local_address,
+        bgp_port,
+        local_as,
+        router_id,
+        peer_up_handler,
+        peer_down_handler,
+        route_handler,
+        error_handler,
+    ):
         self.local_address = local_address
         self.bgp_port = bgp_port
         self.local_as = local_as
@@ -36,10 +45,7 @@ class Beka(object):
         if peer_ip in self.peers:
             raise ValueError("Peer already added: %s %d" % (peer_ip, peer_as))
 
-        self.peers[peer_ip] = {
-            "peer_ip": peer_ip,
-            "peer_as": peer_as
-        }
+        self.peers[peer_ip] = {"peer_ip": peer_ip, "peer_as": peer_as}
 
     def add_route(self, prefix, next_hop):
         self.routes_to_advertise.append(
@@ -47,26 +53,23 @@ class Beka(object):
                 prefix=IPPrefix.from_string(prefix),
                 next_hop=IPAddress.from_string(next_hop),
                 as_path="",
-                origin="IGP"
+                origin="IGP",
             )
         )
 
     def neighbor_states(self):
         states = []
         for peering in self.peerings:
-            states.append((
-                peering.peer_address,
-                {
-                    'info': {
-                        'uptime': peering.uptime()
-                    }
-                }
-            ))
+            states.append(
+                (peering.peer_address, {"info": {"uptime": peering.uptime()}})
+            )
 
         return states
 
     def run(self):
-        self.stream_server = StreamServer((self.local_address, self.bgp_port), self.handle)
+        self.stream_server = StreamServer(
+            (self.local_address, self.bgp_port), self.handle
+        )
         self.stream_server.serve_forever()
 
     def handle(self, socket, address):
@@ -82,10 +85,16 @@ class Beka(object):
             peer_as=peer["peer_as"],
             router_id=self.router_id,
             local_address=self.local_address,
-            neighbor=peer["peer_ip"]
+            neighbor=peer["peer_ip"],
         )
         state_machine.routes_to_advertise = copy(self.routes_to_advertise)
-        peering = Peering(state_machine, address, socket, self.route_handler, error_handler=self.error_handler)
+        peering = Peering(
+            state_machine,
+            address,
+            socket,
+            self.route_handler,
+            error_handler=self.error_handler,
+        )
         self.peerings.append(peering)
         self.peer_up_handler(peer_ip, peer["peer_as"])
         peering.run()

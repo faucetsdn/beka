@@ -9,9 +9,11 @@ from .event import EventTimerExpired, EventMessageReceived
 from .bgp_message import BgpMessageParser, BgpMessagePacker
 from .error import SocketClosedError, IdleError
 
-class Peering(object):
 
-    def __init__(self, state_machine, peer_address, socket, route_handler, error_handler=None):
+class Peering(object):
+    def __init__(
+        self, state_machine, peer_address, socket, route_handler, error_handler=None
+    ):
         self.input_stream = None
         self.chopper = None
         self.pool = None
