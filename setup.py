@@ -6,11 +6,11 @@ import sys
 
 from setuptools import setup
 
-if sys.version_info < (3,):
+if sys.version_info < (3, 10):
     print(
         """You are trying to install beka on python {py}
 
-beka is not compatible with python 2, please upgrade to python 3.8 or newer.""".format(
+beka is not compatible with python earlier than 3.10, please upgrade.""".format(
             py=".".join([str(v) for v in sys.version_info[:3]])
         ),
         file=sys.stderr,
@@ -20,6 +20,6 @@ beka is not compatible with python 2, please upgrade to python 3.8 or newer.""".
 setup(
     name="beka",
     setup_requires=["pbr>=1.9", "setuptools>=17.1"],
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     pbr=True,
 )
