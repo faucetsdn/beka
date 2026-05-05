@@ -1,8 +1,8 @@
+import threading
+import time
 import unittest
+from queue import Queue
 from unittest.mock import patch, call
-
-from eventlet import GreenPool, sleep
-from eventlet.queue import Queue
 
 from beka.peering import Peering
 
@@ -26,18 +26,15 @@ class FakeStateMachine:  # pylint: disable=too-few-public-methods
 class FakeSocket:  # pylint: disable=too-few-public-methods
     """Mocked Socket"""
 
-    def __init__(self):
-        pass
-
     def makefile(self, *args, **kwargs):  # pylint: disable=unused-argument
         return None
+
+    def shutdown(self, _how):  # pragma: no cover - exercised via Peering.shutdown
+        pass
 
 
 class FakeChopper:  # pylint: disable=too-few-public-methods
     """Mocked Chopper"""
-
-    def __init__(self):
-        pass
 
 
 class PeeringTestCase(unittest.TestCase):
@@ -55,25 +52,40 @@ class PeeringTestCase(unittest.TestCase):
     def test_print_route_updates(self):
         fake_route_update = "FAKE ROUTE UPDATE"
         self.state_machine.route_updates.put(fake_route_update)
-        pool = GreenPool()
-        eventlet = pool.spawn(self.peering.print_route_updates)
-        for _ in range(10):
-            sleep(0)
-            if self.route_catcher.route_updates:
-                break
+        thread = threading.Thread(target=self.peering.print_route_updates, daemon=True)
+        thread.start()
+        deadline = time.monotonic() + 1.0
+        while not self.route_catcher.route_updates and time.monotonic() < deadline:
+            time.sleep(0.01)
         self.assertEqual(len(self.route_catcher.route_updates), 1)
         self.assertEqual(self.route_catcher.route_updates[0], fake_route_update)
-        eventlet.kill()
+        # Cooperative shutdown unblocks the consumer's Queue.get().
+        self.peering.shutdown()
+        thread.join(timeout=1)
+        self.assertFalse(thread.is_alive())
 
     def test_run_starts_threads(self):
-        with patch("beka.peering.GreenPool") as GreenPool:
+        with patch("beka.peering.threading.Thread") as Thread:
             self.peering.run()
-        GreenPool().spawn.assert_has_calls(
+        Thread.assert_has_calls(
             [
-                call(self.peering.send_messages),
-                call(self.peering.print_route_updates),
-                call(self.peering.kick_timers),
-                call(self.peering.receive_messages),
-            ]
+                call(
+                    target=self.peering.send_messages, name="send_messages", daemon=True
+                ),
+                call(
+                    target=self.peering.print_route_updates,
+                    name="print_route_updates",
+                    daemon=True,
+                ),
+                call(target=self.peering.kick_timers, name="kick_timers", daemon=True),
+                call(
+                    target=self.peering.receive_messages,
+                    name="receive_messages",
+                    daemon=True,
+                ),
+            ],
+            any_order=False,
         )
-        assert GreenPool().waitall.call_count == 1
+        # Each thread should be started and then joined.
+        self.assertEqual(Thread.return_value.start.call_count, 4)
+        self.assertEqual(Thread.return_value.join.call_count, 4)

@@ -1,4 +1,4 @@
-from eventlet.queue import Queue
+from queue import Queue
 from collections import OrderedDict
 
 from .event import Event

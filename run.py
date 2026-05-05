@@ -1,8 +1,7 @@
 import signal
 import sys
+import threading
 import yaml
-
-from eventlet import GreenPool
 
 from beka.beka import Beka
 
@@ -20,7 +19,7 @@ class Server:
 
     def run(self):
         signal.signal(signal.SIGINT, self.signal_handler)
-        pool = GreenPool()
+        threads = []
 
         with open("beka.yaml", encoding="utf-8") as file:
             config = yaml.safe_load(file.read())
@@ -46,9 +45,14 @@ class Server:
                 for route in router["routes"]:
                     beka.add_route(route["prefix"], route["next_hop"])
             self.bekas.append(beka)
-            pool.spawn_n(beka.run)
-        pool.waitall()
-        printmsg("All greenlets gone, exiting")
+            thread = threading.Thread(
+                target=beka.run, name="beka-%s" % router["local_address"]
+            )
+            thread.start()
+            threads.append(thread)
+        for thread in threads:
+            thread.join()
+        printmsg("All threads gone, exiting")
 
     def signal_handler(self, _signal, _frame):
         printmsg("[SIGINT] Shutting down")
